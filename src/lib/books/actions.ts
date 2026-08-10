@@ -20,7 +20,12 @@ const bookInputSchema = z.object({
   ano: z.coerce.number().int().min(1000).max(2100).optional().nullable(),
   sinopse: z.string().optional().nullable(),
   paginas: z.coerce.number().int().positive().optional().nullable(),
-  capaUrl: z.string().trim().optional().nullable(),
+  capaUrl: z
+    .string()
+    .trim()
+    .max(1_200_000, "URL/capa muito grande.")
+    .optional()
+    .nullable(),
   genero: z.string().trim().max(100).optional().nullable(),
   idioma: z.string().trim().max(60).optional().default("Português"),
   peso: z.coerce
@@ -141,11 +146,23 @@ export async function createBook(
   const tagNames = normalizeTags(parsed.data.tags || []);
   const values = toDbValues(parsed.data, ctx.tenant.id);
 
-  const [row] = await db.insert(books).values(values).returning({ id: books.id });
-  await syncBookTags(ctx.tenant.id, row.id, tagNames);
-
-  revalidatePath("/painel/livros");
-  return { ok: true, id: row.id };
+  try {
+    const [row] = await db
+      .insert(books)
+      .values(values)
+      .returning({ id: books.id });
+    await syncBookTags(ctx.tenant.id, row.id, tagNames);
+    revalidatePath("/painel/livros");
+    return { ok: true, id: row.id };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false,
+      error: /value too long|too large|payload/i.test(msg)
+        ? "Capa ou texto grande demais para gravar. Use URL de capa ou foto menor."
+        : `Falha ao gravar: ${msg}`,
+    };
+  }
 }
 
 export async function updateBook(
@@ -185,16 +202,26 @@ export async function updateBook(
   const { tenantId: _, ...updateValues } = values;
   void _;
 
-  await db
-    .update(books)
-    .set(updateValues)
-    .where(and(eq(books.id, id), eq(books.tenantId, ctx.tenant.id)));
+  try {
+    await db
+      .update(books)
+      .set(updateValues)
+      .where(and(eq(books.id, id), eq(books.tenantId, ctx.tenant.id)));
 
-  await syncBookTags(ctx.tenant.id, id, tagNames);
+    await syncBookTags(ctx.tenant.id, id, tagNames);
 
-  revalidatePath("/painel/livros");
-  revalidatePath(`/painel/livros/${id}`);
-  return { ok: true, id };
+    revalidatePath("/painel/livros");
+    revalidatePath(`/painel/livros/${id}`);
+    return { ok: true, id };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false,
+      error: /value too long|too large|payload/i.test(msg)
+        ? "Capa ou texto grande demais para gravar. Use URL de capa ou foto menor."
+        : `Falha ao gravar: ${msg}`,
+    };
+  }
 }
 
 export async function deleteBook(id: string): Promise<BookActionResult> {

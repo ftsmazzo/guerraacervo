@@ -190,11 +190,11 @@ export async function probeCoverUrl(url: string): Promise<boolean> {
       redirect: "follow",
     });
     if (!r.ok && r.status !== 206) return false;
-    const buf = Buffer.from(await r.arrayBuffer());
-    if (buf.byteLength < 800) return false;
-    const head = buf.subarray(0, 6).toString("ascii");
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    if (bytes.byteLength < 800) return false;
+    const head = String.fromCharCode(...bytes.subarray(0, 6));
     // GIF89a minúsculo = placeholder OL
-    if (head.startsWith("GIF") && buf.byteLength < 4096) return false;
+    if (head.startsWith("GIF") && bytes.byteLength < 4096) return false;
     return true;
   } catch {
     return false;

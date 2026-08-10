@@ -11,7 +11,7 @@ import {
   looksLikeIsbnQuery,
   normISBN,
 } from "@/lib/isbn/normalize";
-import { isPoorSynopsis, synopsisQuality } from "@/lib/isbn/quality";
+import { isPoorSynopsis, synopsisQuality } from "@/lib/isbn/quality-client";
 import { processarTags } from "@/lib/isbn/tags-pt";
 import {
   fetchGoogle,
@@ -38,7 +38,7 @@ type FormSnapshot = {
 };
 
 /** Reduz foto para data-URL usável como capa no formulário */
-async function fileToCoverDataUrl(file: File, maxSide = 900): Promise<string> {
+async function fileToCoverDataUrl(file: File, maxSide = 640): Promise<string> {
   const raw = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
@@ -59,13 +59,33 @@ async function fileToCoverDataUrl(file: File, maxSide = 900): Promise<string> {
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return raw;
+    if (!ctx) {
+      if (raw.length > 700_000) {
+        throw new Error("Foto muito grande; use uma imagem menor ou a capa do catálogo.");
+      }
+      return raw;
+    }
     ctx.drawImage(img, 0, 0, w, h);
-    return canvas.toDataURL("image/jpeg", 0.82);
-  } catch {
+    let quality = 0.72;
+    let out = canvas.toDataURL("image/jpeg", quality);
+    while (out.length > 700_000 && quality > 0.4) {
+      quality -= 0.1;
+      out = canvas.toDataURL("image/jpeg", quality);
+    }
+    if (out.length > 900_000) {
+      throw new Error("Foto muito grande após compressão; use a capa do catálogo.");
+    }
+    return out;
+  } catch (e) {
+    if (e instanceof Error && /muito grande|inválida/i.test(e.message)) throw e;
+    if (raw.length > 700_000) {
+      throw new Error("Foto muito grande; use uma imagem menor ou a capa do catálogo.");
+    }
     return raw;
   }
 }
+
+const MAX_COVER_URL_CHARS = 900_000;
 
 const TAG_COLORS = [
   "#e67e22",
@@ -407,7 +427,13 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
 
   async function buscarIAFoto(file: File) {
     setIsbnMsg("Analisando foto da capa (IA + web)…");
-    const photoDataUrl = await fileToCoverDataUrl(file);
+    let photoDataUrl: string;
+    try {
+      photoDataUrl = await fileToCoverDataUrl(file);
+    } catch (e) {
+      setIsbnMsg(e instanceof Error ? e.message : "Falha ao processar foto");
+      return;
+    }
     // Foto enviada é a verdade visual até haver capa de catálogo validada
     setCoverUrl(photoDataUrl);
     const res = await fetch("/api/isbn/ai", {
@@ -582,35 +608,52 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     e.preventDefault();
     setError(null);
     start(async () => {
-      const payload = {
-        isbn: isbn || null,
-        titulo: title,
-        autor: author || null,
-        editora: publisher || null,
-        ano: year ? Number(year) : null,
-        sinopse: synopsis || null,
-        paginas: pages ? Number(pages) : null,
-        capaUrl: coverUrl || null,
-        genero: genre || null,
-        idioma: language || "Português",
-        peso: Number(weight),
-        estado: condition as "Novo" | "Ótimo" | "Bom" | "Regular",
-        tipoCapa: coverType as "Brochura" | "Capa Dura",
-        precoCompra: purchasePrice ? Number(purchasePrice) : null,
-        precoVenda: Number(salePrice),
-        estoque: Number(stock),
-        localizacao: location || null,
-        tags,
-      };
-      const result = initial?.id
-        ? await updateBook(initial.id, payload)
-        : await createBook(payload);
-      if (!result.ok) {
-        setError(result.error);
-        return;
+      try {
+        let capa = (coverUrl || "").trim() || null;
+        if (capa && capa.startsWith("data:image/") && capa.length > MAX_COVER_URL_CHARS) {
+          setError(
+            "Capa em foto ficou grande demais para salvar. Remova a foto ou use a URL de capa do catálogo.",
+          );
+          return;
+        }
+        const payload = {
+          isbn: isbn || null,
+          titulo: title,
+          autor: author || null,
+          editora: publisher || null,
+          ano: year ? Number(year) : null,
+          sinopse: synopsis || null,
+          paginas: pages ? Number(pages) : null,
+          capaUrl: capa,
+          genero: genre || null,
+          idioma: language || "Português",
+          peso: Number(weight),
+          estado: condition as "Novo" | "Ótimo" | "Bom" | "Regular",
+          tipoCapa: coverType as "Brochura" | "Capa Dura",
+          precoCompra: purchasePrice ? Number(purchasePrice) : null,
+          precoVenda: Number(salePrice),
+          estoque: Number(stock),
+          localizacao: location || null,
+          tags,
+        };
+        const result = initial?.id
+          ? await updateBook(initial.id, payload)
+          : await createBook(payload);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        router.push("/painel/livros");
+        router.refresh();
+      } catch (err) {
+        const msg =
+          err instanceof Error ? err.message : "Falha ao salvar o livro.";
+        setError(
+          /Body exceeded|too large|413|payload/i.test(msg)
+            ? "Dados muito grandes para enviar (provavelmente a capa). Use URL de capa ou foto menor."
+            : msg,
+        );
       }
-      router.push("/painel/livros");
-      router.refresh();
     });
   }
 
