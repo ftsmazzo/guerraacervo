@@ -47,7 +47,9 @@ Health: http://localhost:3000/api/health
 - `src/lib/plans.ts` — Pessoal + Negócio
 - `src/app/painel` — shell operacional do sebo
 - `src/app/admin` — control plane (stub)
-- `src/app/login` — auth stub (próxima etapa)
+- `src/app/login` — auth com cookie assinado (JWT)
+- `src/lib/auth` — sessão, login e contexto tenant/plano
+- `src/middleware.ts` — protege `/painel` e `/admin`
 
 ## Deploy (EasyPanel)
 

@@ -1,19 +1,69 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import {
+  getAuthContext,
+  hasEntitlement,
+  tenantAccessOk,
+} from "@/lib/auth/context";
+import type { Entitlement } from "@/lib/plans";
 
-const nav = [
+type NavItem = {
+  href: string;
+  label: string;
+  entitlement?: Entitlement | Entitlement[];
+};
+
+const nav: NavItem[] = [
   { href: "/painel", label: "Dashboard" },
-  { href: "/painel/livros", label: "Livros" },
-  { href: "/painel/clientes", label: "Clientes" },
-  { href: "/painel/pedidos", label: "Pedidos" },
-  { href: "/painel/relatorios", label: "Relatórios" },
-  { href: "/painel/loja", label: "Loja" },
+  { href: "/painel/livros", label: "Livros", entitlement: "catalog" },
+  { href: "/painel/clientes", label: "Clientes", entitlement: "clients" },
+  { href: "/painel/pedidos", label: "Pedidos", entitlement: "orders" },
+  {
+    href: "/painel/relatorios",
+    label: "Relatórios",
+    entitlement: "reports_basic",
+  },
+  {
+    href: "/painel/loja",
+    label: "Loja",
+    entitlement: ["store_whatsapp", "store_pix"],
+  },
 ];
 
-export default function PainelLayout({
+function allowed(
+  planCode: string | null | undefined,
+  entitlement?: Entitlement | Entitlement[],
+) {
+  if (!entitlement) return true;
+  if (Array.isArray(entitlement)) {
+    return entitlement.some((e) => hasEntitlement(planCode, e));
+  }
+  return hasEntitlement(planCode, entitlement);
+}
+
+function trialLabel(trialEndsAt: Date | null, status: string) {
+  if (status !== "trialing" || !trialEndsAt) return null;
+  const days = Math.max(
+    0,
+    Math.ceil((trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
+  );
+  return `${days} dia${days === 1 ? "" : "s"} restantes`;
+}
+
+export default async function PainelLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const ctx = await getAuthContext();
+  if (!ctx) redirect("/login?next=/painel");
+
+  const planCode = ctx.tenant?.planCode;
+  const access = ctx.tenant ? tenantAccessOk(ctx.tenant) : { ok: true };
+  const trial = ctx.tenant
+    ? trialLabel(ctx.tenant.trialEndsAt, ctx.tenant.status)
+    : null;
+
   return (
     <div className="min-h-screen md:grid md:grid-cols-[230px_1fr]">
       <aside className="border-b border-line bg-sidebar-bg md:border-b-0 md:border-r md:border-line">
@@ -29,35 +79,57 @@ export default function PainelLayout({
           </div>
         </div>
         <nav className="flex gap-1 overflow-x-auto px-2 py-2 md:flex-col">
-          {nav.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-md border-l-[3px] border-transparent px-3 py-2 text-[0.835rem] text-sidebar-text hover:bg-sidebar-hover hover:text-ink"
-            >
-              {item.label}
-            </Link>
-          ))}
+          {nav
+            .filter((item) => allowed(planCode, item.entitlement))
+            .map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="rounded-md border-l-[3px] border-transparent px-3 py-2 text-[0.835rem] text-sidebar-text hover:bg-sidebar-hover hover:text-ink"
+              >
+                {item.label}
+              </Link>
+            ))}
         </nav>
         <div className="hidden border-t border-line px-5 py-4 md:block">
-          <Link
-            href="/admin"
-            className="text-xs text-muted hover:text-accent-text"
-          >
-            Admin plataforma →
-          </Link>
+          {ctx.user.isPlatformAdmin ? (
+            <Link
+              href="/admin"
+              className="text-xs text-muted hover:text-accent-text"
+            >
+              Admin plataforma →
+            </Link>
+          ) : null}
         </div>
       </aside>
       <div className="bg-background">
         <header className="flex h-[58px] items-center justify-between border-b border-line bg-card px-6">
           <div>
-            <p className="text-sm font-medium text-ink">Sebo Demo</p>
-            <p className="text-xs text-muted">Plano: trial · 7 dias</p>
+            <p className="text-sm font-medium text-ink">
+              {ctx.tenant?.name ?? "Sem tenant"}
+            </p>
+            <p className="text-xs text-muted">
+              Plano: {ctx.tenant?.planName ?? "—"}
+              {trial ? ` · trial · ${trial}` : null}
+            </p>
           </div>
-          <Link href="/" className="text-sm text-muted hover:text-ink">
-            Sair
-          </Link>
+          <div className="flex items-center gap-4">
+            <span className="hidden text-xs text-muted sm:inline">
+              {ctx.user.email}
+            </span>
+            <Link
+              href="/api/auth/logout"
+              className="text-sm text-muted hover:text-ink"
+            >
+              Sair
+            </Link>
+          </div>
         </header>
+        {!access.ok ? (
+          <div className="border-b border-line bg-accent-soft px-6 py-3 text-sm text-accent-text">
+            {access.reason} Assine um plano para continuar.
+          </div>
+        ) : null}
         <div className="px-6 py-6">{children}</div>
       </div>
     </div>

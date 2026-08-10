@@ -17,6 +17,7 @@
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.2",
     "ioredis": "^6.0.0",
+    "jose": "^6.2.8",
     "next": "15.5.2",
     "postgres": "^3.4.9",
     "react": "19.1.0",
