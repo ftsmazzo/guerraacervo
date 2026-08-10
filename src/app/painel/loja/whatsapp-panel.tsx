@@ -155,6 +155,14 @@ export function WhatsappPanel({
         </div>
       ) : null}
 
+      {!qr && status === "qr" ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          Aguardando o QR da Evolution. Clique em <strong>Atualizar status</strong>{" "}
+          em alguns segundos. Se não aparecer, use <strong>Desconectar</strong> e
+          depois <strong>Conectar / Gerar QR</strong> de novo.
+        </div>
+      ) : null}
+
       <div className="rounded-lg border border-line bg-card p-4 text-sm text-muted shadow-[var(--shadow)]">
         <p className="font-medium text-ink">O que já funciona</p>
         <ul className="mt-2 list-disc space-y-1 pl-5">

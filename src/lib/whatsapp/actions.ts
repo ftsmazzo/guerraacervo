@@ -16,6 +16,7 @@ import {
   logoutInstance,
   resolveEvolutionConfig,
   setInstanceWebhook,
+  waitForQr,
 } from "@/lib/whatsapp/evolution";
 import { getWhatsappConnection } from "@/lib/whatsapp/queries";
 
@@ -64,9 +65,10 @@ export async function connectWhatsapp(): Promise<WhatsappActionResult> {
   let conn = await getWhatsappConnection(ctx.tenant.id);
 
   try {
+    let createPayload: unknown = null;
     if (!conn) {
       try {
-        await createInstance(cfg, instance);
+        createPayload = await createInstance(cfg, instance);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         // já existe — segue
@@ -81,18 +83,25 @@ export async function connectWhatsapp(): Promise<WhatsappActionResult> {
         })
         .returning();
       conn = created;
+    } else {
+      // reaplica connect mesmo com registro local
+      createPayload = null;
     }
 
     await setInstanceWebhook(cfg, instance).catch(() => null);
 
-    const connectPayload = await connectInstance(cfg, instance);
-    const qr = extractQrBase64(connectPayload);
+    let qr =
+      extractQrBase64(createPayload) ||
+      (await waitForQr(cfg, instance, 12, 2000)).qr;
+
     const statePayload = await connectionState(cfg, instance).catch(() => null);
     const state =
       statePayload?.instance?.state ||
       statePayload?.state ||
-      (qr ? "qr" : "disconnected");
-    const status = mapState(state);
+      (qr ? "connecting" : "close");
+    let status = mapState(state);
+    if (qr) status = "qr";
+    if (!qr && status === "disconnected") status = "qr";
 
     await db
       .update(whatsappConnections)
@@ -109,6 +118,17 @@ export async function connectWhatsapp(): Promise<WhatsappActionResult> {
       );
 
     revalidatePath("/painel/loja");
+
+    if (!qr) {
+      return {
+        ok: true,
+        status: "qr",
+        qr: null,
+        message:
+          "Instância criada, mas o QR ainda não foi gerado pela Evolution. Aguarde alguns segundos e clique em Atualizar status. Se persistir, use Desconectar e Conectar de novo.",
+      };
+    }
+
     return {
       ok: true,
       status,
@@ -144,14 +164,22 @@ export async function refreshWhatsappStatus(): Promise<WhatsappActionResult> {
     let qr = conn.lastQr;
 
     if (status !== "open") {
-      const connectPayload = await connectInstance(
-        cfg,
-        conn.instanceName,
-      ).catch(() => null);
-      const freshQr = extractQrBase64(connectPayload);
+      const waited = await waitForQr(cfg, conn.instanceName, 8, 1500);
+      const freshQr = waited.qr || extractQrBase64(waited.raw);
       if (freshQr) {
         qr = freshQr;
         status = "qr";
+      } else if (!qr) {
+        // tenta um connect avulso
+        const connectPayload = await connectInstance(
+          cfg,
+          conn.instanceName,
+        ).catch(() => null);
+        const once = extractQrBase64(connectPayload);
+        if (once) {
+          qr = once;
+          status = "qr";
+        }
       }
     } else {
       qr = null;

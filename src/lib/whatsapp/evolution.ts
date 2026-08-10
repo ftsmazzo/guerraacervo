@@ -144,13 +144,72 @@ export async function sendTextMessage(
 export function extractQrBase64(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
   const p = payload as Record<string, unknown>;
-  if (typeof p.base64 === "string") return p.base64;
+
+  const fromObj = (obj: Record<string, unknown> | null | undefined) => {
+    if (!obj) return null;
+    if (typeof obj.base64 === "string" && obj.base64.length > 20) {
+      return obj.base64;
+    }
+    return null;
+  };
+
+  const direct = fromObj(p);
+  if (direct) return direct;
+
   if (typeof p.qrcode === "object" && p.qrcode) {
-    const q = p.qrcode as Record<string, unknown>;
-    if (typeof q.base64 === "string") return q.base64;
+    const nested = fromObj(p.qrcode as Record<string, unknown>);
+    if (nested) return nested;
   }
-  if (typeof p.qrcode === "string") return p.qrcode;
+
+  if (typeof p.qrcode === "string" && p.qrcode.length > 20) {
+    return p.qrcode;
+  }
+
+  // alguns payloads aninham em data
+  if (typeof p.data === "object" && p.data) {
+    const nested = extractQrBase64(p.data);
+    if (nested) return nested;
+  }
+
   return null;
+}
+
+/** Aguarda o Baileys publicar o QR (count > 0 / base64). */
+export async function waitForQr(
+  cfg: EvolutionConfig,
+  instance: string,
+  attempts = 10,
+  delayMs = 2000,
+): Promise<{ qr: string | null; raw: unknown }> {
+  let last: unknown = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      last = await connectInstance(cfg, instance);
+      const qr = extractQrBase64(last);
+      if (qr) return { qr, raw: last };
+      const count =
+        typeof last === "object" &&
+        last &&
+        "count" in last &&
+        typeof (last as { count: unknown }).count === "number"
+          ? (last as { count: number }).count
+          : typeof last === "object" &&
+              last &&
+              "qrcode" in last &&
+              typeof (last as { qrcode: { count?: number } }).qrcode ===
+                "object"
+            ? (last as { qrcode: { count?: number } }).qrcode?.count
+            : null;
+      if (typeof count === "number" && count > 0) {
+        const again = extractQrBase64(last);
+        if (again) return { qr: again, raw: last };
+      }
+    } catch {
+      // retry
+    }
+    await new Promise((r) => setTimeout(r, delayMs));
+  }
+  return { qr: null, raw: last };
 }
 
 export function normalizePhone(raw: string): string {
