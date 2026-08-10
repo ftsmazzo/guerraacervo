@@ -609,7 +609,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     setError(null);
     start(async () => {
       try {
-        let capa = (coverUrl || "").trim() || null;
+        const capa = (coverUrl || "").trim() || null;
         if (capa && capa.startsWith("data:image/") && capa.length > MAX_COVER_URL_CHARS) {
           setError(
             "Capa em foto ficou grande demais para salvar. Remova a foto ou use a URL de capa do catálogo.",
