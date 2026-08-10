@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   bookTags,
@@ -15,6 +15,10 @@ import {
   sendTextMessage,
 } from "@/lib/whatsapp/evolution";
 import { getWhatsappConnection } from "@/lib/whatsapp/queries";
+import {
+  filterInterestTags,
+  isGenericInterestTag,
+} from "@/lib/whatsapp/interest-tags";
 
 const QUEUE_KEY = "ga:wa:notify";
 
@@ -57,9 +61,11 @@ async function bookInterestKeys(
   const keys = new Set<string>();
   for (const t of tagRows) {
     const n = t.name.trim().toLowerCase();
-    if (n) keys.add(n);
+    if (n && !isGenericInterestTag(n)) keys.add(n);
   }
-  if (book?.genre?.trim()) keys.add(book.genre.trim().toLowerCase());
+  if (book?.genre?.trim() && !isGenericInterestTag(book.genre)) {
+    keys.add(book.genre.trim().toLowerCase());
+  }
   return [...keys];
 }
 
@@ -72,6 +78,7 @@ async function recipientsForNewBook(tenantId: string, bookId: string) {
       name: clients.name,
       whatsapp: clients.whatsapp,
       tag: clientInterestTags.tag,
+      tagId: clientInterestTags.id,
     })
     .from(clients)
     .innerJoin(clientProfiles, eq(clientProfiles.clientId, clients.id))
@@ -90,12 +97,17 @@ async function recipientsForNewBook(tenantId: string, bookId: string) {
     );
 
   const rows = await base;
+  const genericTagIds: string[] = [];
   const byClient = new Map<
     string,
     { id: string; name: string; whatsapp: string | null; matched?: string }
   >();
 
   for (const r of rows) {
+    if (r.tag && isGenericInterestTag(r.tag) && r.tagId) {
+      genericTagIds.push(r.tagId);
+      continue;
+    }
     const existing = byClient.get(r.id) || {
       id: r.id,
       name: r.name,
@@ -109,6 +121,12 @@ async function recipientsForNewBook(tenantId: string, bookId: string) {
       existing.matched = r.tag;
     }
     byClient.set(r.id, existing);
+  }
+
+  if (genericTagIds.length) {
+    await db
+      .delete(clientInterestTags)
+      .where(inArray(clientInterestTags.id, [...new Set(genericTagIds)]));
   }
 
   const all = [...byClient.values()].filter((c) => c.whatsapp);

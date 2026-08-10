@@ -9,6 +9,7 @@ import {
   tags,
   whatsappConnections,
 } from "@/db/schema";
+import { filterInterestTags } from "@/lib/whatsapp/interest-tags";
 
 export async function getWhatsappConnection(tenantId: string) {
   const [row] = await db
@@ -95,13 +96,9 @@ export async function upsertInterestTags(
   source: "declared" | "purchase" | "engagement",
   weight = 1,
 ) {
-  const cleaned = [
-    ...new Set(
-      tagNames
-        .map((t) => t.trim().toLowerCase())
-        .filter((t) => t.length > 0 && t.length <= 80),
-    ),
-  ];
+  const cleaned = filterInterestTags(
+    tagNames.map((t) => t.trim().toLowerCase()),
+  );
   for (const tag of cleaned) {
     const [existing] = await db
       .select()

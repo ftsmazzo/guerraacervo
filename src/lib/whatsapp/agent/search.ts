@@ -8,6 +8,10 @@ import {
   orders,
   tags,
 } from "@/db/schema";
+import {
+  filterInterestTags,
+  isGenericInterestTag,
+} from "@/lib/whatsapp/interest-tags";
 
 export type CatalogHit = {
   id: string;
@@ -70,10 +74,25 @@ export async function getClientInterestTagNames(
   clientId: string,
 ): Promise<string[]> {
   const rows = await db
-    .select({ tag: clientInterestTags.tag, weight: clientInterestTags.weight })
+    .select({
+      id: clientInterestTags.id,
+      tag: clientInterestTags.tag,
+      weight: clientInterestTags.weight,
+    })
     .from(clientInterestTags)
     .where(eq(clientInterestTags.clientId, clientId));
+
+  const genericIds = rows
+    .filter((r) => isGenericInterestTag(r.tag))
+    .map((r) => r.id);
+  if (genericIds.length) {
+    await db
+      .delete(clientInterestTags)
+      .where(inArray(clientInterestTags.id, genericIds));
+  }
+
   return rows
+    .filter((r) => !isGenericInterestTag(r.tag))
     .sort((a, b) => b.weight - a.weight)
     .map((r) => r.tag.toLowerCase());
 }
@@ -120,28 +139,28 @@ export async function searchCatalogForAgent(opts: {
     if (tagMatchedIds.length) parts.push(inArray(books.id, tagMatchedIds));
     conditions.push(or(...parts)!);
   } else if (opts.interestTags?.length) {
-    const interestLike = opts.interestTags
-      .map((t) => t.toLowerCase())
-      .slice(0, 12);
-    const interestHits = await db
-      .select({ bookId: bookTags.bookId })
-      .from(bookTags)
-      .innerJoin(tags, eq(tags.id, bookTags.tagId))
-      .innerJoin(books, eq(books.id, bookTags.bookId))
-      .where(
-        and(
-          eq(books.tenantId, opts.tenantId),
-          sql`${books.stock} > 0`,
-          sql`lower(${tags.name}) in (${sql.join(
-            interestLike.map((t) => sql`${t}`),
-            sql`, `,
-          )})`,
-        ),
-      )
-      .limit(60);
-    const ids = [...new Set(interestHits.map((t) => t.bookId))];
-    if (ids.length) {
-      conditions.push(inArray(books.id, ids));
+    const interestLike = filterInterestTags(opts.interestTags).slice(0, 12);
+    if (interestLike.length) {
+      const interestHits = await db
+        .select({ bookId: bookTags.bookId })
+        .from(bookTags)
+        .innerJoin(tags, eq(tags.id, bookTags.tagId))
+        .innerJoin(books, eq(books.id, bookTags.bookId))
+        .where(
+          and(
+            eq(books.tenantId, opts.tenantId),
+            sql`${books.stock} > 0`,
+            sql`lower(${tags.name}) in (${sql.join(
+              interestLike.map((t) => sql`${t}`),
+              sql`, `,
+            )})`,
+          ),
+        )
+        .limit(60);
+      const ids = [...new Set(interestHits.map((t) => t.bookId))];
+      if (ids.length) {
+        conditions.push(inArray(books.id, ids));
+      }
     }
   }
 
@@ -174,17 +193,19 @@ export async function searchCatalogForAgent(opts: {
     tagsForBooks(ids),
   ]);
 
-  const interest = new Set(
-    (opts.interestTags || []).map((t) => t.toLowerCase()),
-  );
+  const interest = new Set(filterInterestTags(opts.interestTags || []));
 
   const hits: CatalogHit[] = [];
   for (const r of rows) {
     const res = reserved.get(r.id) ?? 0;
     const available = r.stock - res;
     if (available <= 0) continue;
-    const bookTagsList = tagMap.get(r.id) || [];
-    if (r.genre) bookTagsList.push(r.genre.toLowerCase());
+    const bookTagsList = (tagMap.get(r.id) || []).filter(
+      (t) => !isGenericInterestTag(t),
+    );
+    if (r.genre && !isGenericInterestTag(r.genre)) {
+      bookTagsList.push(r.genre.toLowerCase());
+    }
     let score = 0;
     for (const t of bookTagsList) {
       if (interest.has(t.toLowerCase())) score += 3;
