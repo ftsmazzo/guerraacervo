@@ -14,6 +14,7 @@ import {
   resolveEvolutionConfig,
   sendTextMessage,
 } from "@/lib/whatsapp/evolution";
+import { setSuggestedBooks } from "@/lib/whatsapp/agent/debounce";
 import { getWhatsappConnection } from "@/lib/whatsapp/queries";
 import { isGenericInterestTag } from "@/lib/whatsapp/interest-tags";
 
@@ -179,6 +180,7 @@ export async function drainNotifyQueue(max = 20) {
 
         try {
           await sendTextMessage(cfg, conn.instanceName, phone, text);
+          await setSuggestedBooks(job.tenantId, phone, [job.bookId]);
           processed += 1;
         } catch (err) {
           console.warn("[whatsapp] send falhou", c.id, err);

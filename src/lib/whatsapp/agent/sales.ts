@@ -26,8 +26,15 @@ import {
   searchCatalogForAgent,
   type CatalogHit,
 } from "@/lib/whatsapp/agent/search";
+import {
+  extractTopicQuery,
+  normalizeTitle,
+  titlesLooselyMatch,
+} from "@/lib/whatsapp/agent/text-utils";
 import type { EvolutionConfig } from "@/lib/whatsapp/evolution";
 import { sendTextMessage } from "@/lib/whatsapp/evolution";
+
+export { extractTopicQuery } from "@/lib/whatsapp/agent/text-utils";
 
 function money(v: string | number) {
   return Number(v).toLocaleString("pt-BR", {
@@ -63,21 +70,7 @@ function formatSoftList(hits: CatalogHit[]) {
     .join("\n\n");
 }
 
-/** Tira ruído de "aceito indicação / buscando algo do…" e deixa autor/tema. */
-export function extractTopicQuery(text: string): string {
-  return text
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .replace(/[^\p{L}\p{N}\s.]/gu, " ")
-    .replace(/\./g, " ")
-    .replace(
-      /\b(aceito|aceita|quero|gostaria|por\s+favor|pf|pfv|oi|ola|manda|me|um|uma|uns|umas|algo|algum|alguma|to|tou|estou|ta|buscando|procurando|procuro|busca|ver|tem|indicacao|indicacoes|recomenda|recomendacao|sugestao|sugere|no\s+meu\s+gosto|livros?|titulo|autor|escritor)\b/gi,
-      " ",
-    )
-    .replace(/\b(d[oa]s?|de|do|da|dos|das)\b/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+/** Tira ruído — ver text-utils (reexport acima). */
 
 function ordinalIndex(text: string): number {
   const t = text.toLowerCase();
@@ -110,6 +103,19 @@ function strongHeuristicIntent(text: string): SalesIntent | null {
     return { intent: "status_order", query: "", bookIndex: 0, replyHint: "" };
   }
 
+  // Confirmação do item sugerido / do aviso de novo livro
+  if (
+    /^(esse|essa|este|esta)(\s+(mesmo|t[ií]tulo|livro))?(\s+mesmo)?[.!?]*$/i.test(
+      t,
+    ) ||
+    /^(esse|essa)\s+t[ií]tulo(\s+mesmo)?[.!?]*$/i.test(t) ||
+    /^(quero\s+)?(esse|essa|este|o\s*mesmo)[.!?]*$/i.test(t) ||
+    /^(pode ser|fechado|leva|levalo|levar)[.!?]*$/i.test(t) ||
+    /^pode ser (esse|essa|o\s*1|o primeiro)[.!?]*$/i.test(t)
+  ) {
+    return { intent: "reserve", query: "", bookIndex: 1, replyHint: "" };
+  }
+
   const idx = ordinalIndex(t);
   const wantsReserve =
     /\b(reserv|quero|pega|ficar|fechado|compra|leva|esse|essa|este|esta)\b/.test(
@@ -131,10 +137,22 @@ function strongHeuristicIntent(text: string): SalesIntent | null {
     return { intent: "reserve", query: "", bookIndex: idx, replyHint: "" };
   }
 
+  // "pode ser A Isca..." / "quero o cristianismo puro"
+  if (
+    /^(pode ser|quero|quero o|quero a|leva|levar)\b/i.test(t) &&
+    t.length >= 8
+  ) {
+    const q = t
+      .replace(/^(pode ser|quero a|quero o|quero|leva[vr]?)\s+/i, "")
+      .trim();
+    if (q.length >= 4) {
+      return { intent: "reserve", query: q, bookIndex: 0, replyHint: "" };
+    }
+  }
+
   const wantsRec = /\b(indica|recomenda|sugest|no meu gosto)\b/.test(t);
   const topic = extractTopicQuery(text);
   if (wantsRec) {
-    // "Aceito indicação. CS Lewis" → search, não recommend genérico
     if (topic.length >= 3) {
       return { intent: "search", query: topic, bookIndex: 0, replyHint: "" };
     }
@@ -190,6 +208,7 @@ async function classifyIntent(
           content:
             buildSalesSystemPrompt(seboName) +
             "\nClassifique a intenção em JSON. " +
+            '"esse mesmo", "esse título", "reservar" (após aviso/lista) = reserve bookIndex 1. ' +
             '"quero o 2", "o livro 2", "reservar 1" = reserve com bookIndex. ' +
             "Se citar autor/tema (mesmo junto com indicação), intent=search e query=autor/tema. " +
             "Só use recommend quando pedir indicação SEM autor/tema. " +
@@ -229,16 +248,6 @@ async function classifyIntent(
   }
 }
 
-function normalizeTitle(s: string) {
-  return s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 async function resolveReserveBookId(opts: {
   tenantId: string;
   phone: string;
@@ -252,22 +261,26 @@ async function resolveReserveBookId(opts: {
   }
 
   const needle = normalizeTitle(opts.query || opts.rawText);
-  if (needle.length >= 4 && suggested.length) {
+  if (needle.length >= 3 && suggested.length) {
     const books = await getBooksByIds(opts.tenantId, suggested);
-    const hit = books.find((b) => {
-      const title = normalizeTitle(b.title);
-      return title.includes(needle) || needle.includes(title.slice(0, 20));
-    });
+    const hit = books.find((b) => titlesLooselyMatch(b.title, needle));
     if (hit) return hit.id;
   }
 
-  if (opts.query.trim().length >= 4) {
+  const catalogQuery = (opts.query || opts.rawText).trim();
+  if (catalogQuery.length >= 4 && !/^reserv(ar)?$/i.test(catalogQuery)) {
     const found = await searchCatalogForAgent({
       tenantId: opts.tenantId,
-      query: opts.query,
-      limit: 1,
+      query: catalogQuery,
+      limit: 5,
     });
-    return found[0]?.id;
+    const loose = found.find((b) => titlesLooselyMatch(b.title, catalogQuery));
+    if (loose) return loose.id;
+    if (found[0] && found[0].score >= 5) return found[0].id;
+  }
+
+  if (suggested[0] && /^reserv(ar)?$/i.test(opts.rawText.trim())) {
+    return suggested[0];
   }
 
   return suggested[0];
@@ -389,8 +402,9 @@ async function findSimilarHits(opts: {
 function fallbackSellerReply(opts: {
   firstName: string;
   focus: string;
-  mode: "direct" | "similar" | "recommend" | "empty" | "chitchat";
+  mode: "direct" | "similar" | "recommend" | "empty" | "chitchat" | "over_budget";
   hits: CatalogHit[];
+  budgetNote?: string;
 }): string {
   const hi = opts.firstName ? `${opts.firstName}, ` : "";
   const focus = opts.focus.trim();
@@ -402,10 +416,20 @@ function fallbackSellerReply(opts: {
     );
   }
 
+  if (opts.mode === "over_budget" && opts.hits.length) {
+    const faixa = opts.budgetNote || "sua faixa";
+    return (
+      `${hi}tenho *${focus}* sim — só que fica um pouco acima da faixa que você passou (${faixa}):\n\n` +
+      formatSoftList(opts.hits) +
+      `\n\nSe ainda assim quiser, é só mandar *1*, *2* ou *3* (ou o título). Posso também caçar algo parecido dentro da faixa.`
+    );
+  }
+
   if (opts.mode === "direct" && opts.hits.length) {
     return (
       `${hi}do *${focus}* tenho isto agora:\n\n` +
       formatSoftList(opts.hits) +
+      (opts.budgetNote ? `\n\n_${opts.budgetNote}_` : "") +
       `\n\nTem algum título específico dele em mente? Se algum desses servir, é só mandar *1*, *2* ou *3*.`
     );
   }
@@ -413,7 +437,7 @@ function fallbackSellerReply(opts: {
   if (opts.mode === "similar" && opts.hits.length) {
     return (
       `${hi}do *${focus}* mesmo não tem na prateleira agora.\n` +
-      `Você lembra de algum título em especial? (Nárnia, Cristianismo Puro e Simples… o que estiver buscando.)\n\n` +
+      `Você lembra de algum título em especial?\n\n` +
       `Enquanto isso, na mesma linha temática achei:\n\n` +
       formatSoftList(opts.hits) +
       `\n\nQuer algum desses, ou prefere que eu fique de olho no autor?`
@@ -443,8 +467,9 @@ async function composeSellerReply(opts: {
   firstName: string;
   userText: string;
   focus: string;
-  mode: "direct" | "similar" | "recommend" | "empty" | "chitchat";
+  mode: "direct" | "similar" | "recommend" | "empty" | "chitchat" | "over_budget";
   hits: CatalogHit[];
+  budgetNote?: string;
 }): Promise<string> {
   const fallback = fallbackSellerReply(opts);
   const cfg = resolveOpenRouterConfig();
@@ -482,7 +507,11 @@ async function composeSellerReply(opts: {
               pedido_do_cliente: opts.userText,
               foco: opts.focus || null,
               situacao: opts.mode,
-              // direct = temos do autor/tema; similar = não temos, oferecemos linha próxima
+              nota_orcamento: opts.budgetNote || null,
+              regra_orcamento:
+                opts.mode === "over_budget"
+                  ? "Os livros EXISTEM, mas passam da faixa de preço do cliente. Mostre-os com transparência e ofereça reservar ou buscar dentro da faixa."
+                  : "Se houver nota_orcamento, mencione de leve.",
               livros_permitidos: catalog,
               regra:
                 "Só cite livros de livros_permitidos. Numere 1..n. Não invente. Mensagem curta de WhatsApp.",
@@ -496,7 +525,6 @@ async function composeSellerReply(opts: {
     const parsed = JSON.parse(content) as { message?: string };
     const msg = (parsed.message || "").trim();
     if (msg.length < 20) return fallback;
-    // Garante que títulos da lista aparecem (anti-alucinação grosseira)
     if (opts.hits.length) {
       const ok = opts.hits.some((h) =>
         msg.toLowerCase().includes(h.title.toLowerCase().slice(0, 18)),
@@ -592,11 +620,15 @@ export async function runSalesAgent(opts: {
       rawText: opts.text,
     });
     if (!bookId) {
+      const hasSuggest = (await getSuggestedBooks(opts.tenantId, opts.phone))
+        .length;
       await sendTextMessage(
         opts.cfg,
         opts.instanceName,
         opts.phone,
-        "Me diz qual: *1*, *2* ou *3* da lista — ou o título certinho.",
+        hasSuggest
+          ? "Me diz qual: *1*, *2* ou *3* da lista — ou o título certinho."
+          : "Qual título você quer reservar? Pode colar o nome ou pedir *indicações*.",
       );
       return;
     }
@@ -613,18 +645,31 @@ export async function runSalesAgent(opts: {
 
   // Título citado que bate com sugestão recente → reserva direta
   const suggested = await getSuggestedBooks(opts.tenantId, opts.phone);
-  if (suggested.length && opts.text.trim().length >= 6) {
+  if (suggested.length && opts.text.trim().length >= 4) {
     const books = await getBooksByIds(opts.tenantId, suggested);
-    const needle = normalizeTitle(opts.text);
-    const hit = books.find((b) => {
-      const title = normalizeTitle(b.title);
-      return (
-        title === needle ||
-        title.includes(needle) ||
-        (needle.length >= 10 && needle.includes(title.slice(0, 18)))
-      );
-    });
+    const hit = books.find((b) => titlesLooselyMatch(b.title, opts.text));
     if (hit) {
+      await doReserve({
+        cfg: opts.cfg,
+        tenantId: opts.tenantId,
+        instanceName: opts.instanceName,
+        phone: opts.phone,
+        clientId: opts.clientId,
+        bookId: hit.id,
+      });
+      return;
+    }
+  }
+
+  // Título longo colado (mesmo sem sugestão recente)
+  if (opts.text.trim().length >= 12 && !/^\d+$/.test(opts.text.trim())) {
+    const found = await searchCatalogForAgent({
+      tenantId: opts.tenantId,
+      query: opts.text.trim(),
+      limit: 5,
+    });
+    const hit = found.find((b) => titlesLooselyMatch(b.title, opts.text));
+    if (hit && hit.score >= 5) {
       await doReserve({
         cfg: opts.cfg,
         tenantId: opts.tenantId,
@@ -643,9 +688,36 @@ export async function runSalesAgent(opts: {
   const focus =
     (intent.query || (!isRecommend ? extractTopicQuery(opts.text) : "")).trim();
 
-  let mode: "direct" | "similar" | "recommend" | "empty" | "chitchat" =
+  let mode:
+    | "direct"
+    | "similar"
+    | "recommend"
+    | "empty"
+    | "chitchat"
+    | "over_budget" =
     intent.intent === "chitchat" && !focus ? "chitchat" : "empty";
   let hits: CatalogHit[] = [];
+  let budgetNote = "";
+
+  const withinBudget = (h: CatalogHit) => {
+    const p = Number(h.salePrice);
+    if (opts.budgetMax != null && opts.budgetMax > 0 && p > opts.budgetMax) {
+      return false;
+    }
+    if (opts.budgetMin != null && opts.budgetMin > 0 && p < opts.budgetMin) {
+      return false;
+    }
+    return true;
+  };
+
+  const budgetLabel = () => {
+    if (opts.budgetMin != null && opts.budgetMax != null) {
+      return `${money(opts.budgetMin)} a ${money(opts.budgetMax)}`;
+    }
+    if (opts.budgetMax != null) return `até ${money(opts.budgetMax)}`;
+    if (opts.budgetMin != null) return `a partir de ${money(opts.budgetMin)}`;
+    return "";
+  };
 
   if (isRecommend && !focus) {
     hits = await searchCatalogForAgent({
@@ -663,44 +735,51 @@ export async function runSalesAgent(opts: {
     }
     mode = hits.length ? "recommend" : "empty";
   } else if (focus) {
-    // 1) O que tem do autor/tema de verdade
-    const authorHits = await searchCatalogForAgent({
+    const authorHitsAll = await searchCatalogForAgent({
       tenantId: opts.tenantId,
       query: focus,
-      budgetMin: opts.budgetMin,
-      budgetMax: opts.budgetMax,
-      limit: 6,
+      limit: 8,
       authorOnly: true,
     });
-    if (authorHits.length) {
-      hits = authorHits.slice(0, 3);
+    const topicHitsAll = authorHitsAll.length
+      ? authorHitsAll
+      : await searchCatalogForAgent({
+          tenantId: opts.tenantId,
+          query: focus,
+          interestTags: interest,
+          limit: 8,
+        });
+
+    const strongAll = topicHitsAll.filter(
+      (h) => h.score >= 5 || authorMatchesQuery(h.author, focus),
+    );
+    const pool = strongAll.length ? strongAll : topicHitsAll;
+    const inB = pool.filter(withinBudget);
+    const outB = pool.filter((h) => !withinBudget(h));
+
+    if (inB.length) {
+      hits = inB.slice(0, 3);
       mode = "direct";
-    } else {
-      // 2) Título/tema no catálogo (não só autor)
-      const topicHits = await searchCatalogForAgent({
+      if (outB.length && budgetLabel()) {
+        budgetNote = `Na sua faixa (${budgetLabel()}) tenho estes. Tem outros do pedido um pouco acima — posso mostrar se quiser.`;
+      }
+    } else if (outB.length) {
+      hits = outB.slice(0, 3);
+      mode = "over_budget";
+      budgetNote = budgetLabel();
+    } else if (!pool.length) {
+      hits = await findSimilarHits({
         tenantId: opts.tenantId,
-        query: focus,
+        focus,
+        excludeIds: new Set(),
         interestTags: interest,
         budgetMin: opts.budgetMin,
         budgetMax: opts.budgetMax,
-        limit: 6,
       });
-      const strong = topicHits.filter((h) => h.score >= 5).slice(0, 3);
-      if (strong.length) {
-        hits = strong;
-        mode = "direct";
-      } else {
-        // 3) Sem o pedido → similares na mesma linha + pergunta de título
-        hits = await findSimilarHits({
-          tenantId: opts.tenantId,
-          focus,
-          excludeIds: new Set(topicHits.map((h) => h.id)),
-          interestTags: interest,
-          budgetMin: opts.budgetMin,
-          budgetMax: opts.budgetMax,
-        });
-        mode = hits.length ? "similar" : "empty";
-      }
+      mode = hits.length ? "similar" : "empty";
+    } else {
+      hits = pool.slice(0, 3);
+      mode = "direct";
     }
   }
 
@@ -717,6 +796,7 @@ export async function runSalesAgent(opts: {
     focus,
     mode,
     hits,
+    budgetNote,
   });
 
   await sendTextMessage(opts.cfg, opts.instanceName, opts.phone, reply);

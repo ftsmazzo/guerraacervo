@@ -1,7 +1,10 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { clientProfiles } from "@/db/schema";
-import { shouldProcessMessage } from "@/lib/whatsapp/agent/debounce";
+import {
+  shouldProcessMessage,
+  takePendingSearch,
+} from "@/lib/whatsapp/agent/debounce";
 import { runSalesAgent } from "@/lib/whatsapp/agent/sales";
 import {
   normalizePhone,
@@ -50,13 +53,9 @@ export async function handleInboundMessage(opts: {
     return;
   }
 
-  if (!(await shouldProcessMessage(conn.tenantId, phone))) {
-    return;
-  }
-
   const client = await findClientByWhatsapp(conn.tenantId, phone);
-  // Sem cadastro no balcão: não cria cliente fantasma; só apresentação curta
   if (!client) {
+    if (!(await shouldProcessMessage(conn.tenantId, phone))) return;
     await softColdReply({
       tenantId: conn.tenantId,
       instanceName: conn.instanceName,
@@ -68,8 +67,13 @@ export async function handleInboundMessage(opts: {
 
   const profile = await getOrCreateClientProfile(conn.tenantId, client.id);
   const text = opts.text.trim();
+  const onboardingBusy = profile.onboardingStatus === "in_progress";
 
-  // Retomar bot após handoff
+  // Onboarding: sem debounce (respostas rápidas não podem sumir)
+  if (!onboardingBusy) {
+    if (!(await shouldProcessMessage(conn.tenantId, phone))) return;
+  }
+
   if (
     profile.onboardingStep === "human" &&
     (profile.onboardingStatus === "done" ||
@@ -99,7 +103,6 @@ export async function handleInboundMessage(opts: {
     return;
   }
 
-  // Ainda não convidado (compra/pago no balcão): soft reply
   if (profile.onboardingStatus === "pending") {
     await softColdReply({
       tenantId: conn.tenantId,
@@ -110,9 +113,8 @@ export async function handleInboundMessage(opts: {
     return;
   }
 
-  // Convite enviado / onboarding em andamento
   if (profile.onboardingStatus === "in_progress") {
-    await runOnboardingFlow({
+    const result = await runOnboardingFlow({
       cfg,
       tenantId: conn.tenantId,
       instanceName: conn.instanceName,
@@ -122,10 +124,34 @@ export async function handleInboundMessage(opts: {
       text,
       pushName: opts.pushName,
     });
+
+    if (result.completed) {
+      const pending =
+        (await takePendingSearch(conn.tenantId, phone)) ||
+        result.pendingSearch;
+      if (pending) {
+        const [fresh] = await db
+          .select()
+          .from(clientProfiles)
+          .where(eq(clientProfiles.id, profile.id))
+          .limit(1);
+        await runSalesAgent({
+          cfg,
+          tenantId: conn.tenantId,
+          instanceName: conn.instanceName,
+          phone,
+          clientId: client.id,
+          clientName: client.name,
+          profileId: profile.id,
+          budgetMin: fresh?.budgetMin ?? profile.budgetMin,
+          budgetMax: fresh?.budgetMax ?? profile.budgetMax,
+          text: pending,
+        });
+      }
+    }
     return;
   }
 
-  // done / skipped → agente de vendas
   if (isPauseBot(text) || isHandoffKeyword(text)) {
     await db
       .update(clientProfiles)

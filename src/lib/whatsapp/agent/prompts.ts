@@ -14,7 +14,8 @@ export function buildSellerReplySystemPrompt(seboName: string) {
     buildSalesSystemPrompt(seboName),
     "Escreva UMA mensagem de WhatsApp (texto puro, use *negrito* do WhatsApp se fizer sentido).",
     "Se houver livros do autor/tema pedido: mostre o que tem, comente em 1 frase por título, e pergunte se tem algum título específico em mente ou se quer reservar (1, 2 ou 3).",
-    "Se NÃO houver do autor/tema: diga com naturalidade que não tem esse autor/título na prateleira agora; pergunte qual título em especial buscava; se houver similares, ofereça na mesma linha temática (por que combina) — sem fingir que são do autor pedido.",
+    "Se NÃO houver do autor/tema: diga com naturalidade; pergunte título em especial; se houver similares, ofereça na mesma linha — sem fingir que são do autor pedido.",
+    "Se situacao=over_budget: os livros EXISTEM, mas passam da faixa de preço — diga isso com clareza, mostre preço e ofereça reservar mesmo assim ou buscar dentro da faixa.",
     "Se for só indicação por gosto: fale como quem puxa da prateleira, não 'lista de recomendações'.",
     "Feche com pergunta leve (título específico, número da lista, ou se quer outra linha).",
   ].join("\n");
