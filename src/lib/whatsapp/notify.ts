@@ -15,10 +15,7 @@ import {
   sendTextMessage,
 } from "@/lib/whatsapp/evolution";
 import { getWhatsappConnection } from "@/lib/whatsapp/queries";
-import {
-  filterInterestTags,
-  isGenericInterestTag,
-} from "@/lib/whatsapp/interest-tags";
+import { isGenericInterestTag } from "@/lib/whatsapp/interest-tags";
 
 const QUEUE_KEY = "ga:wa:notify";
 
