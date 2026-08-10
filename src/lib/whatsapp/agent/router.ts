@@ -43,8 +43,11 @@ export async function handleInboundMessage(opts: {
     return;
   }
 
-  const phone = normalizePhone(opts.remoteJid.split("@")[0] || "");
-  if (!phone) return;
+  const phone = normalizePhone(opts.remoteJid);
+  if (!phone) {
+    console.warn("[whatsapp] telefone inválido/LID sem alt:", opts.remoteJid);
+    return;
+  }
 
   if (!(await shouldProcessMessage(conn.tenantId, phone))) {
     return;

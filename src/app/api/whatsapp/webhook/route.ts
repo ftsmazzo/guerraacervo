@@ -13,15 +13,55 @@ function eventName(body: Record<string, unknown>): string {
   return String(e).toLowerCase();
 }
 
+function unwrapMessage(msg: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
+  if (!msg || typeof msg !== "object") return null;
+  const ephemeral = msg.ephemeralMessage as { message?: Record<string, unknown> } | undefined;
+  if (ephemeral?.message) return unwrapMessage(ephemeral.message);
+  const viewOnce = msg.viewOnceMessage as { message?: Record<string, unknown> } | undefined;
+  if (viewOnce?.message) return unwrapMessage(viewOnce.message);
+  const viewOnceV2 = msg.viewOnceMessageV2 as { message?: Record<string, unknown> } | undefined;
+  if (viewOnceV2?.message) return unwrapMessage(viewOnceV2.message);
+  return msg;
+}
+
 function extractText(message: Record<string, unknown>): string {
-  const msg = (message.message || message) as Record<string, unknown>;
-  if (!msg || typeof msg !== "object") return "";
+  const raw = (message.message || message) as Record<string, unknown>;
+  const msg = unwrapMessage(raw);
+  if (!msg) return "";
   if (typeof msg.conversation === "string") return msg.conversation;
   const ext = msg.extendedTextMessage as { text?: string } | undefined;
   if (ext?.text) return ext.text;
   const btn = msg.buttonsResponseMessage as { selectedDisplayText?: string } | undefined;
   if (btn?.selectedDisplayText) return btn.selectedDisplayText;
+  const list = msg.listResponseMessage as { title?: string; singleSelectReply?: { selectedRowId?: string } } | undefined;
+  if (list?.title) return list.title;
   return "";
+}
+
+/** Prefer phone JID over WhatsApp LID (@lid). */
+function resolveRemoteJid(m: Record<string, unknown>): string {
+  const key = (m.key || {}) as {
+    remoteJid?: string;
+    remoteJidAlt?: string;
+    participant?: string;
+    participantAlt?: string;
+    addressingMode?: string;
+  };
+  const candidates = [
+    key.remoteJidAlt,
+    key.participantAlt,
+    key.remoteJid,
+    key.participant,
+    typeof m.remoteJid === "string" ? m.remoteJid : "",
+  ].filter(Boolean) as string[];
+
+  const phoneJid = candidates.find((j) => j.includes("@s.whatsapp.net"));
+  if (phoneJid) return phoneJid;
+
+  const nonLid = candidates.find((j) => j && !j.includes("@lid"));
+  if (nonLid) return nonLid;
+
+  return candidates[0] || "";
 }
 
 export async function POST(request: Request) {
@@ -117,18 +157,33 @@ export async function POST(request: Request) {
           remoteJid?: string;
         };
         if (key.fromMe) continue;
-        const remoteJid = key.remoteJid || String(m.remoteJid || "");
+        const remoteJid = resolveRemoteJid(m);
         if (!remoteJid) continue;
         const text = extractText(m);
         if (!text.trim()) continue;
         const pushName =
           typeof m.pushName === "string" ? m.pushName : undefined;
-        await handleInboundMessage({
-          instanceName: instance || String(m.instance || ""),
-          remoteJid,
-          text,
-          pushName,
-        });
+        const instanceName =
+          instance ||
+          String(m.instance || body.instance || "").trim() ||
+          "";
+        if (!instanceName) {
+          console.error("[whatsapp webhook] instance vazio", {
+            evt,
+            remoteJid,
+          });
+          continue;
+        }
+        try {
+          await handleInboundMessage({
+            instanceName,
+            remoteJid,
+            text,
+            pushName,
+          });
+        } catch (err) {
+          console.error("[whatsapp webhook] handler", err);
+        }
       }
     }
   } catch (e) {
