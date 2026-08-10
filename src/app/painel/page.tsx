@@ -1,4 +1,5 @@
-import { getAuthContext } from "@/lib/auth/context";
+import { getAuthContext, hasEntitlement } from "@/lib/auth/context";
+import { countTenantClients } from "@/lib/clients/queries";
 import { canAddBook, countTenantBooks } from "@/lib/tenant-limits";
 import { getPlan } from "@/lib/plans";
 
@@ -12,6 +13,10 @@ export default async function PainelDashboardPage() {
   const limit = tenantId
     ? await canAddBook(tenantId, planCode)
     : { ok: true, current: 0, max: null as number | null };
+  const clientCount =
+    tenantId && hasEntitlement(planCode, "clients")
+      ? await countTenantClients(tenantId)
+      : null;
 
   const cards = [
     {
@@ -21,7 +26,10 @@ export default async function PainelDashboardPage() {
           ? String(bookCount)
           : `${bookCount} / ${limit.max}`,
     },
-    { label: "Clientes", value: "—" },
+    {
+      label: "Clientes",
+      value: clientCount === null ? "—" : String(clientCount),
+    },
     { label: "Pedidos abertos", value: "—" },
     { label: "Receita do mês", value: "—" },
   ];
