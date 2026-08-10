@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { clientProfiles, clients } from "@/db/schema";
+import { clientProfiles } from "@/db/schema";
 import { shouldProcessMessage } from "@/lib/whatsapp/agent/debounce";
 import { runSalesAgent } from "@/lib/whatsapp/agent/sales";
 import {
@@ -8,6 +8,7 @@ import {
   resolveEvolutionConfig,
   sendTextMessage,
 } from "@/lib/whatsapp/evolution";
+import { softColdReply } from "@/lib/whatsapp/invite";
 import { runOnboardingFlow } from "@/lib/whatsapp/onboarding";
 import {
   findClientByWhatsapp,
@@ -24,7 +25,7 @@ function isPauseBot(text: string) {
 }
 
 function isResumeBot(text: string) {
-  return /voltar\s*bot|reativar\s*bot|assistente/i.test(text.trim());
+  return /voltar\s*bot|reativar\s*bot/i.test(text.trim());
 }
 
 export async function handleInboundMessage(opts: {
@@ -53,19 +54,16 @@ export async function handleInboundMessage(opts: {
     return;
   }
 
-  let client = await findClientByWhatsapp(conn.tenantId, phone);
+  const client = await findClientByWhatsapp(conn.tenantId, phone);
+  // Sem cadastro no balcão: não cria cliente fantasma; só apresentação curta
   if (!client) {
-    const name =
-      opts.pushName?.trim() || `Cliente WhatsApp ${phone.slice(-4)}`;
-    const [created] = await db
-      .insert(clients)
-      .values({
-        tenantId: conn.tenantId,
-        name,
-        whatsapp: phone,
-      })
-      .returning();
-    client = created;
+    await softColdReply({
+      tenantId: conn.tenantId,
+      instanceName: conn.instanceName,
+      phone,
+      pushName: opts.pushName,
+    });
+    return;
   }
 
   const profile = await getOrCreateClientProfile(conn.tenantId, client.id);
@@ -90,7 +88,6 @@ export async function handleInboundMessage(opts: {
       );
       return;
     }
-    // em handoff: não responde (humano atende), salvo se pedirem de novo
     if (isHandoffKeyword(text)) {
       await sendTextMessage(
         cfg,
@@ -102,11 +99,19 @@ export async function handleInboundMessage(opts: {
     return;
   }
 
-  const onboarded =
-    profile.onboardingStatus === "done" ||
-    profile.onboardingStatus === "skipped";
+  // Ainda não convidado (compra/pago no balcão): soft reply
+  if (profile.onboardingStatus === "pending") {
+    await softColdReply({
+      tenantId: conn.tenantId,
+      instanceName: conn.instanceName,
+      phone,
+      pushName: opts.pushName,
+    });
+    return;
+  }
 
-  if (!onboarded) {
+  // Convite enviado / onboarding em andamento
+  if (profile.onboardingStatus === "in_progress") {
     await runOnboardingFlow({
       cfg,
       tenantId: conn.tenantId,
@@ -120,6 +125,7 @@ export async function handleInboundMessage(opts: {
     return;
   }
 
+  // done / skipped → agente de vendas
   if (isPauseBot(text) || isHandoffKeyword(text)) {
     await db
       .update(clientProfiles)

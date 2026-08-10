@@ -172,15 +172,18 @@ export function WhatsappPanel({
           </span>
         </p>
         <ul className="mt-2 list-disc space-y-1 pl-5">
-          <li>Onboarding de perfil (gêneros, temas, preço, opt-in)</li>
           <li>
-            Indicações e busca no acervo (OpenRouter + tags do cliente)
+            Perfil no WhatsApp só depois do pedido <strong>Pago</strong> no
+            balcão (obrigado + perguntas curtas)
           </li>
           <li>
-            Reserva de pedido em <strong>Aguardando Pagamento</strong>
+            Mensagem fria: apresentação do sebo, sem interrogatório
           </li>
           <li>
-            Handoff humano (*atendente* / *sair*) — no perfil do cliente use{" "}
+            Indicações e reserva após o perfil (Aguardando Pagamento)
+          </li>
+          <li>
+            Handoff (*atendente* / *sair*) — no cliente use{" "}
             <strong>Retomar bot</strong>
           </li>
         </ul>

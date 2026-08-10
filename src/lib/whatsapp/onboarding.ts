@@ -62,8 +62,10 @@ export async function runOnboardingFlow(opts: {
   }> = {};
 
   if (step === "welcome") {
+    // Fallback se ainda estiver em welcome (convite pós-pago já manda a 1ª pergunta)
+    const first = opts.client.name.split(" ")[0] || "";
     reply =
-      `Olá${opts.pushName ? `, ${opts.pushName}` : ""}! Sou o assistente do sebo 📚\n` +
+      `Oi${first ? `, ${first}` : ""}! Obrigado pela compra 📚\n` +
       `Vamos montar seu perfil em 4 perguntas rápidas.\n\n` +
       `1) Quais *gêneros* você mais gosta? (ex.: romance, suspense, história)`;
     nextStep = "genres";

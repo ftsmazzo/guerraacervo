@@ -295,6 +295,22 @@ export async function updateOrderStatus(
       } catch {
         // tags de compra não bloqueiam status
       }
+      if (novoStatus === "Pago") {
+        try {
+          const { inviteProfileAfterPaid } = await import(
+            "@/lib/whatsapp/invite"
+          );
+          const inv = await inviteProfileAfterPaid({
+            tenantId,
+            clientId: pedido.clientId,
+          });
+          if (inv.sent) {
+            message += " Convite de perfil enviado no WhatsApp.";
+          }
+        } catch {
+          // convite WA não bloqueia status
+        }
+      }
     } else if (deveDevolver) message += " Estoque devolvido.";
 
     revalidatePath("/painel/pedidos");
