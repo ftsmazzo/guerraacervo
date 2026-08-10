@@ -65,7 +65,7 @@ function formatSoftList(hits: CatalogHit[]) {
 
 /** Tira ruído de "aceito indicação / buscando algo do…" e deixa autor/tema. */
 export function extractTopicQuery(text: string): string {
-  let s = text
+  return text
     .normalize("NFD")
     .replace(/\p{M}/gu, "")
     .replace(/[^\p{L}\p{N}\s.]/gu, " ")
@@ -77,7 +77,6 @@ export function extractTopicQuery(text: string): string {
     .replace(/\b(d[oa]s?|de|do|da|dos|das)\b/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
-  return s;
 }
 
 function ordinalIndex(text: string): number {
