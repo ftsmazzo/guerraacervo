@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: guerraacervo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: guerra
+      POSTGRES_PASSWORD: guerra
+      POSTGRES_DB: guerraacervo
+    ports:
+      - "5433:5432"
+    volumes:
+      - guerraacervo_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U guerra -d guerraacervo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    container_name: guerraacervo-redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "guerra"]
+    ports:
+      - "6380:6379"
+    volumes:
+      - guerraacervo_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "guerra", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  guerraacervo_pg:
+  guerraacervo_redis:
