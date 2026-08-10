@@ -234,7 +234,8 @@ export async function updateOrderStatus(
   const statusAtual = pedido.status;
   const jaDebitado = isDebitStatus(statusAtual);
   const vaiDebitar = isDebitStatus(novoStatus);
-  const ficouCancelado = novoStatus === "Cancelado";
+  // Pago/Enviado/Entregue → Aguardando ou Cancelado: devolve estoque
+  const deveDevolver = jaDebitado && !vaiDebitar;
 
   try {
     await db.transaction(async (tx) => {
@@ -257,7 +258,7 @@ export async function updateOrderStatus(
               and(eq(books.id, item.bookId), eq(books.tenantId, tenantId)),
             );
         }
-      } else if (jaDebitado && ficouCancelado) {
+      } else if (deveDevolver) {
         for (const item of itens) {
           await tx
             .update(books)
@@ -281,7 +282,7 @@ export async function updateOrderStatus(
 
     let message = `Status atualizado para '${novoStatus}'.`;
     if (vaiDebitar && !jaDebitado) message += " Estoque atualizado.";
-    else if (ficouCancelado && jaDebitado) message += " Estoque devolvido.";
+    else if (deveDevolver) message += " Estoque devolvido.";
 
     revalidatePath("/painel/pedidos");
     revalidatePath(`/painel/pedidos/${id}`);
