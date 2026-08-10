@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createBook, updateBook } from "@/lib/books/actions";
 import { mergeData } from "@/lib/isbn/merge";
-import { isPlausibleCoverUrl, normISBN } from "@/lib/isbn/normalize";
+import {
+  isPlausibleCoverUrl,
+  looksLikeEnglish,
+  looksLikeIsbnQuery,
+  normISBN,
+} from "@/lib/isbn/normalize";
+import { processarTags } from "@/lib/isbn/tags-pt";
 import {
   fetchGoogle,
   fetchHathiTrust,
@@ -14,6 +20,21 @@ import {
   fetchOpenLibrarySearch,
   fetchPhpScraper,
 } from "@/lib/isbn/sources-client";
+
+type FormSnapshot = {
+  title: string;
+  author: string;
+  publisher: string;
+  year: string;
+  synopsis: string;
+  genre: string;
+  language: string;
+  pages: string;
+  weight: string;
+  coverType: string;
+  coverUrl: string;
+  tagsCount: number;
+};
 
 /** Reduz foto para data-URL usável como capa no formulário */
 async function fileToCoverDataUrl(file: File, maxSide = 900): Promise<string> {
@@ -185,10 +206,35 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
 
   async function buscarISBN(
     code?: string,
-    opts?: { soft?: boolean; keepCover?: string },
+    opts?: {
+      soft?: boolean;
+      /** enrich = só completa lacunas; não sobrescreve IA/foto */
+      mode?: "replace" | "enrich";
+      base?: FormSnapshot;
+      keepCover?: string;
+    },
   ): Promise<{ ok: boolean; capa?: string }> {
     const raw = (code ?? isbnBusca).trim();
     if (!raw) return { ok: false };
+
+    // Título digitado no campo ISBN → busca por IA (ex.: "48 leis do poder")
+    if (!looksLikeIsbnQuery(raw)) {
+      setAiQuery(raw);
+      setIsbnMsg(`Buscando por título: “${raw}”…`);
+      const res = await fetch("/api/isbn/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: raw, webSearch: true }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        setIsbnMsg(d.error || "Falha na busca por título");
+        return { ok: false };
+      }
+      await applyAiResult(d);
+      return { ok: true };
+    }
+
     const isbnN = normISBN(raw);
     setIsbnBusca(isbnN);
     setShowProgress(true);
@@ -231,38 +277,121 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
       }
       return { ok: false };
     }
+
+    const enrich = opts?.mode === "enrich";
+    const base = opts?.base;
+    const keepCover = opts?.keepCover || "";
+    const preferKeepCover =
+      keepCover.startsWith("data:image/") ||
+      (keepCover && !merged.capa) ||
+      enrich;
+
     setIsbn(isbnN);
+
+    if (enrich && base) {
+      // Completa só o que a IA não trouxe; nunca troca PT por inglês pobre
+      if (!base.title.trim() && merged.titulo) setTitle(merged.titulo);
+      if (!base.author.trim() && merged.autor) setAuthor(merged.autor);
+      if (!base.publisher.trim() && merged.editora) setPublisher(merged.editora);
+      if (!base.year.trim() && merged.ano) setYear(merged.ano);
+      if (
+        (!base.synopsis.trim() ||
+          (looksLikeEnglish(base.synopsis) &&
+            merged.sinopse &&
+            !looksLikeEnglish(merged.sinopse))) &&
+        merged.sinopse &&
+        !looksLikeEnglish(merged.sinopse)
+      ) {
+        if (!base.synopsis.trim()) setSynopsis(merged.sinopse);
+      } else if (!base.synopsis.trim() && merged.sinopse && !looksLikeEnglish(merged.sinopse)) {
+        setSynopsis(merged.sinopse);
+      }
+      if (!base.genre.trim() && merged.genero && !looksLikeEnglish(merged.genero)) {
+        setGenre(merged.genero);
+      }
+      if (
+        !base.language.trim() ||
+        (/english|inglês/i.test(merged.idioma) &&
+          /portug/i.test(base.language))
+      ) {
+        // mantém português da IA
+      } else if (!base.language.trim() && merged.idioma) {
+        setLanguage(merged.idioma);
+      }
+      if (!base.pages.trim() && merged.paginas) setPages(String(merged.paginas));
+      if (!base.weight.trim() && merged.peso) setWeight(String(merged.peso));
+      if (merged.tipoCapa) setCoverType(merged.tipoCapa);
+
+      // Capa: foto/upload sempre vence; catálogo só se keepCover vazio e capa plausível
+      if (preferKeepCover && keepCover) {
+        setCoverUrl(keepCover);
+      } else if (
+        merged.capa &&
+        isPlausibleCoverUrl(merged.capa) &&
+        !merged.capa.includes("covers.openlibrary.org/b/isbn/")
+      ) {
+        setCoverUrl(merged.capa);
+      } else if (keepCover) {
+        setCoverUrl(keepCover);
+      }
+
+      // Tags: só PT, e só se a IA trouxe poucas
+      if (base.tagsCount < 3) {
+        processarTags(merged.tags).forEach(addTag);
+      }
+      setIsbnMsg(
+        `ISBN ${isbnN} · enriquecido com: ${merged.fontes.join(" + ") || "fontes"} (sem sobrescrever a IA)`,
+      );
+      return {
+        ok: true,
+        capa:
+          preferKeepCover && keepCover
+            ? keepCover
+            : merged.capa && isPlausibleCoverUrl(merged.capa)
+              ? merged.capa
+              : keepCover || undefined,
+      };
+    }
+
+    // Modo replace (busca ISBN manual)
     setTitle(merged.titulo);
     if (merged.autor) setAuthor(merged.autor);
     if (merged.editora) setPublisher(merged.editora);
     if (merged.ano) setYear(merged.ano);
-    if (merged.sinopse) setSynopsis(merged.sinopse);
+    if (merged.sinopse && !looksLikeEnglish(merged.sinopse)) {
+      setSynopsis(merged.sinopse);
+    } else if (merged.sinopse && !synopsis) {
+      setSynopsis(merged.sinopse);
+    }
     if (merged.genero) setGenre(merged.genero);
     if (merged.idioma) setLanguage(merged.idioma);
     const capaOk =
-      merged.capa && isPlausibleCoverUrl(merged.capa) ? merged.capa : "";
-    if (capaOk) {
-      setCoverUrl(capaOk);
-    } else if (opts?.keepCover) {
-      setCoverUrl(opts.keepCover);
-    }
+      merged.capa &&
+      isPlausibleCoverUrl(merged.capa) &&
+      !merged.capa.includes("covers.openlibrary.org/b/isbn/")
+        ? merged.capa
+        : "";
+    if (capaOk) setCoverUrl(capaOk);
+    else if (opts?.keepCover) setCoverUrl(opts.keepCover);
     if (merged.paginas) setPages(String(merged.paginas));
     if (merged.peso && !weight) setWeight(String(merged.peso));
     if (merged.tipoCapa) setCoverType(merged.tipoCapa);
-    merged.tags.forEach(addTag);
+    processarTags(merged.tags).forEach(addTag);
     setIsbnMsg(
       `Dados mesclados de: ${merged.fontes.join(" + ") || "fontes disponíveis"}`,
     );
     return { ok: true, capa: capaOk || undefined };
   }
 
-  async function buscarIATexto() {
-    if (!aiQuery.trim()) return;
+  async function buscarIATexto(queryOverride?: string) {
+    const q = (queryOverride ?? aiQuery).trim();
+    if (!q) return;
+    setAiQuery(q);
     setIsbnMsg("Consultando IA + web…");
     const res = await fetch("/api/isbn/ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: aiQuery, webSearch: true }),
+      body: JSON.stringify({ query: q, webSearch: true }),
     });
     const d = await res.json();
     if (!res.ok) {
@@ -275,7 +404,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
   async function buscarIAFoto(file: File) {
     setIsbnMsg("Analisando foto da capa (IA + web)…");
     const photoDataUrl = await fileToCoverDataUrl(file);
-    // Já mostra a foto enquanto a IA trabalha
+    // Foto enviada é a verdade visual até haver capa de catálogo validada
     setCoverUrl(photoDataUrl);
     const res = await fetch("/api/isbn/ai", {
       method: "POST",
@@ -285,7 +414,6 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     const d = await res.json();
     if (!res.ok) {
       setIsbnMsg(d.error || "Falha na IA");
-      // mantém a foto enviada
       setCoverUrl(photoDataUrl);
       return;
     }
@@ -296,6 +424,8 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     d: Record<string, unknown>,
     opts?: { uploadedCover?: string },
   ) {
+    const photo = opts?.uploadedCover || "";
+
     if (d.titulo) setTitle(String(d.titulo));
     if (d.autor) setAuthor(String(d.autor));
     if (d.editora) setPublisher(String(d.editora));
@@ -303,6 +433,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     if (d.sinopse) setSynopsis(String(d.sinopse));
     if (d.genero) setGenre(String(d.genero));
     if (d.idioma) setLanguage(String(d.idioma));
+    else setLanguage("Português");
     if (d.paginas) setPages(String(d.paginas));
     if (d.tipoCapa === "Brochura" || d.tipoCapa === "Capa Dura") {
       setCoverType(d.tipoCapa);
@@ -310,21 +441,28 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     if (typeof d.peso === "number" && d.peso > 0) {
       setWeight(String(d.peso));
     }
-    if (Array.isArray(d.tags)) d.tags.forEach((t) => addTag(String(t)));
-    if (typeof d.colecao === "string" && d.colecao.trim()) {
-      addTag(d.colecao.trim());
-    }
 
-    const catalogCover =
+    const aiTags = processarTags([
+      ...(Array.isArray(d.tags) ? d.tags.map(String) : []),
+      ...(typeof d.colecao === "string" && d.colecao.trim()
+        ? [d.colecao.trim()]
+        : []),
+    ]);
+    aiTags.forEach(addTag);
+
+    const catalogCoverRaw =
       typeof d.capa === "string" && isPlausibleCoverUrl(d.capa) ? d.capa : "";
-    const photo = opts?.uploadedCover || "";
-    // Prioridade: capa de catálogo real > foto enviada > nada
-    if (catalogCover) {
+    // Nunca usar placeholder OL /b/isbn/…; foto vence
+    const catalogCover =
+      catalogCoverRaw &&
+      !catalogCoverRaw.includes("covers.openlibrary.org/b/isbn/")
+        ? catalogCoverRaw
+        : "";
+
+    if (photo) {
+      setCoverUrl(photo);
+    } else if (catalogCover) {
       setCoverUrl(catalogCover);
-    } else if (photo) {
-      setCoverUrl(photo);
-    } else if (d.useUploadedCover && photo) {
-      setCoverUrl(photo);
     }
 
     const isbnFound =
@@ -341,32 +479,50 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
       : [];
     const extra = avisos.length ? ` · ${avisos.join(" ")}` : "";
 
-    // Só dispara motores quando o servidor confirmou o ISBN em catálogo
+    const snapshot: FormSnapshot = {
+      title: String(d.titulo || ""),
+      author: String(d.autor || ""),
+      publisher: String(d.editora || ""),
+      year: String(d.ano || ""),
+      synopsis: String(d.sinopse || ""),
+      genre: String(d.genero || ""),
+      language: String(d.idioma || "Português"),
+      pages: d.paginas ? String(d.paginas) : "",
+      weight: typeof d.peso === "number" && d.peso > 0 ? String(d.peso) : "",
+      coverType:
+        d.tipoCapa === "Brochura" || d.tipoCapa === "Capa Dura"
+          ? d.tipoCapa
+          : "Brochura",
+      coverUrl: photo || catalogCover || "",
+      tagsCount: aiTags.length,
+    };
+
     if (isbnFound && d.isbnConfirmado === true) {
       setIsbnBusca(isbnFound);
-      setIsbnMsg(`${src}${conf} — confirmando nas fontes…`);
+      setIsbnMsg(`${src}${conf} — enriquecendo com fontes (sem sobrescrever)…`);
       const r = await buscarISBN(isbnFound, {
         soft: true,
-        keepCover: catalogCover || photo || undefined,
+        mode: "enrich",
+        base: snapshot,
+        keepCover: photo || catalogCover || undefined,
       });
       if (r.ok) {
-        if (!r.capa && (catalogCover || photo)) {
-          setCoverUrl(catalogCover || photo);
-        }
-        setIsbnMsg(`${src}${conf} · ISBN confirmado${extra}`);
+        // Garante foto se catálogo não trouxe capa boa
+        if (photo) setCoverUrl(photo);
+        setIsbnMsg(`${src}${conf} · ficha da IA preservada · ISBN ${isbnFound}${extra}`);
         return;
       }
       setIsbn(isbnFound);
-      if (!catalogCover && photo) setCoverUrl(photo);
+      if (photo) setCoverUrl(photo);
       setIsbnMsg(
-        `${src}${conf} · ISBN ${isbnFound} sem retorno nas fontes — mantendo ficha da IA e capa da foto.`,
+        `${src}${conf} · ISBN ${isbnFound} registrado; fontes extras sem dados · capa da foto mantida.`,
       );
       return;
     }
 
     setIsbn("");
     if (!isbnFound) setIsbnBusca("");
-    if (!catalogCover && photo) setCoverUrl(photo);
+    if (photo) setCoverUrl(photo);
     setIsbnMsg(`Preenchido por ${src}${conf}${extra}`);
   }
 
@@ -500,22 +656,23 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
               ISBN
             </div>
             <div style={{ flex: 1 }}>
-              <div className="text-sm font-semibold">Busca Automática por ISBN</div>
+              <div className="text-sm font-semibold">Busca por ISBN ou título</div>
               <div className="text-xs text-muted">
-                Google Books, Open Library, HathiTrust, Mercado Livre e scraper BR
+                Digite ISBN ou título. Google Books, Open Library, HathiTrust,
+                Mercado Livre e scraper BR
               </div>
             </div>
             <div className="flex flex-wrap gap-2" style={{ flex: "1 1 280px" }}>
               <input
                 value={isbnBusca}
                 onChange={(e) => setIsbnBusca(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), buscarISBN())}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), void buscarISBN())}
                 className="form-control"
-                placeholder="ISBN-10 ou ISBN-13…"
-                maxLength={17}
+                placeholder="ISBN ou título (ex: 48 leis do poder)"
+                maxLength={120}
                 style={{ flex: 1 }}
               />
-              <button type="button" className="btn-accent" onClick={() => buscarISBN()}>
+              <button type="button" className="btn-accent" onClick={() => void buscarISBN()}>
                 Buscar
               </button>
               <button
@@ -557,7 +714,13 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
                   className="form-control"
                   value={aiQuery}
                   onChange={(e) => setAiQuery(e.target.value)}
-                  placeholder="Ex: Dom Casmurro Machado de Assis edição Ática"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void buscarIATexto();
+                    }
+                  }}
+                  placeholder="Ex: 48 leis do poder Robert Greene"
                 />
                 <button
                   type="button"

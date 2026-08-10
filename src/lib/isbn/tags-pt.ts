@@ -116,13 +116,27 @@ export function traduzirTag(tag: string): string {
   return tag;
 }
 
-export function processarTags(rawTags: string[]): string[] {
+export function processarTags(
+  rawTags: string[],
+  opts?: { dropUntranslatedEnglish?: boolean },
+): string[] {
+  const dropEn = opts?.dropUntranslatedEnglish !== false;
+  const ptValues = new Set(Object.values(TAGS_PT));
   return [
     ...new Set(
       rawTags
-        .flatMap((t) => t.split(/\s*[\/&]\s*/))
+        .flatMap((t) => t.split(/\s*[\/&,;]\s*/))
         .map((t) => traduzirTag(t.trim()))
-        .filter((t) => t.length >= 3 && t.length <= 50),
+        .map((t) => t.toLowerCase())
+        .filter((t) => t.length >= 3 && t.length <= 40)
+        .filter((t) => {
+          if (!dropEn) return true;
+          if (ptValues.has(t)) return true;
+          if (/[áàâãäéêëíïóôõöúüç]/i.test(t)) return true;
+          // sobrou inglês puro sem tradução → descarta
+          if (/^[a-z][a-z0-9\s'-]*$/i.test(t)) return false;
+          return true;
+        }),
     ),
-  ];
+  ].slice(0, 12);
 }

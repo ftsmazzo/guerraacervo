@@ -301,16 +301,25 @@ Consultas sugeridas:
     }
   }
 
-  // 4) Capa por título se ainda faltar
-  if (!result.capa) {
+  // 4) Capa por título se ainda faltar (nunca placeholder OL /b/isbn/)
+  if (
+    !result.capa ||
+    result.capa.includes("covers.openlibrary.org/b/isbn/")
+  ) {
+    result.capa = result.capa.includes("covers.openlibrary.org/b/isbn/")
+      ? ""
+      : result.capa;
     const found = await findCoverByTitleAuthor(
       result.titulo,
       result.autor,
       result.editora,
     );
-    if (found) {
-      result.capa = found;
-      result.capaOrigem = "titulo";
+    if (found && !found.includes("covers.openlibrary.org/b/isbn/")) {
+      const { probeCoverUrl } = await import("@/lib/isbn/normalize");
+      if (await probeCoverUrl(found)) {
+        result.capa = found;
+        result.capaOrigem = "titulo";
+      }
     }
   }
 
@@ -410,11 +419,18 @@ Tarefa: preencher ficha a partir da descrição (+ web).`;
 
     await enrichIsbnAndWeight(result, cfg, webSearch);
 
-    if (isImage && !result.capa) {
-      result.capaOrigem = "nenhuma";
-      result.avisos.push(
-        "Capa de catálogo não encontrada — use a foto enviada no formulário.",
-      );
+    // Fluxo com foto: capa upload tem prioridade — não devolver placeholder
+    if (isImage) {
+      if (
+        !result.capa ||
+        result.capa.includes("covers.openlibrary.org/b/isbn/")
+      ) {
+        result.capa = "";
+        result.capaOrigem = "nenhuma";
+        result.avisos.push(
+          "Mantendo a foto enviada como capa (catálogo sem imagem confiável).",
+        );
+      }
     }
 
     return NextResponse.json({

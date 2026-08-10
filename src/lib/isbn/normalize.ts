@@ -149,3 +149,54 @@ export function isPlausibleCoverUrl(url: string): boolean {
     /zoom=\d/.test(parsed.search);
   return trusted || looksImage;
 }
+
+/** Texto parece ISBN (não título). "48 leis do poder" → false */
+export function looksLikeIsbnQuery(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (!trimmed) return false;
+  const compact = trimmed.replace(/[-\s]/g, "");
+  if (/^\d{9}[\dXx]$/i.test(compact)) return true;
+  if (/^\d{13}$/.test(compact)) return true;
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length < 10 || digits.length > 13) return false;
+  const alnum = trimmed.replace(/[\s\-]/g, "");
+  return digits.length / Math.max(alnum.length, 1) >= 0.85;
+}
+
+/** Heurística: sinopse/texto predominantemente em inglês */
+export function looksLikeEnglish(text: string): boolean {
+  const t = text.toLowerCase();
+  if (t.length < 40) return false;
+  const en = (t.match(/\b(the|and|of|with|from|this|that|his|her|for|are)\b/g) || [])
+    .length;
+  const pt = (
+    t.match(/\b(de|da|do|que|para|com|uma|os|as|não|mais|pelo|pela)\b/g) || []
+  ).length;
+  return en >= pt + 2;
+}
+
+/**
+ * Open Library costuma devolver GIF 1×1 para ISBN sem capa.
+ * Rejeita respostas miúdas / placeholder.
+ */
+export async function probeCoverUrl(url: string): Promise<boolean> {
+  if (!isPlausibleCoverUrl(url)) return false;
+  if (url.startsWith("data:image/")) return true;
+  try {
+    const r = await fetch(url, {
+      method: "GET",
+      headers: { Range: "bytes=0-2048" },
+      cache: "no-store",
+      redirect: "follow",
+    });
+    if (!r.ok && r.status !== 206) return false;
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.byteLength < 800) return false;
+    const head = buf.subarray(0, 6).toString("ascii");
+    // GIF89a minúsculo = placeholder OL
+    if (head.startsWith("GIF") && buf.byteLength < 4096) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}

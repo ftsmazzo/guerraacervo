@@ -3,6 +3,7 @@ import {
   isValidIsbnChecksum,
   normISBN,
   parsePeso,
+  probeCoverUrl,
   toISBN10,
 } from "@/lib/isbn/normalize";
 
@@ -63,6 +64,11 @@ function coverFromImages(images: Record<string, string> | undefined): string {
   return "";
 }
 
+async function safeCover(url: string): Promise<string> {
+  if (!url) return "";
+  return (await probeCoverUrl(url)) ? url : "";
+}
+
 /**
  * Estimativa prática de sebo quando o catálogo não traz peso.
  * Brochura ~0,9 g/página + capa; dura um pouco mais.
@@ -108,7 +114,9 @@ export async function verifyIsbnExists(isbnRaw: string): Promise<{
           ok: true,
           isbn13,
           titulo: String(inf.title),
-          capa: coverFromImages(inf.imageLinks as Record<string, string>),
+          capa: await safeCover(
+            coverFromImages(inf.imageLinks as Record<string, string>),
+          ),
           paginas: Number(inf.pageCount) || null,
           editora: String(inf.publisher || ""),
           peso: null,
@@ -136,12 +144,12 @@ export async function verifyIsbnExists(isbnRaw: string): Promise<{
       >;
       const b = ol[key];
       if (b?.title) {
-        const capa = b.cover?.large || b.cover?.medium || "";
+        const capaRaw = b.cover?.large || b.cover?.medium || "";
         return {
           ok: true,
           isbn13,
           titulo: b.title,
-          capa: isPlausibleCoverUrl(capa) ? capa : "",
+          capa: await safeCover(capaRaw),
           paginas: b.number_of_pages || null,
           editora: (b.publishers || []).map((p) => p.name || "").join(", "),
           peso: b.weight ? parsePeso(String(b.weight)) : null,
@@ -367,7 +375,7 @@ export async function resolveIsbnByMetadata(input: {
   return {
     ...pick,
     isbn13: verified.isbn13,
-    capa: pick.capa || verified.capa || "",
+    capa: (await safeCover(pick.capa || verified.capa || "")) || "",
     paginas: pick.paginas || verified.paginas || null,
     peso: pick.peso || verified.peso || null,
     editora: pick.editora || verified.editora || editora,
