@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { and, desc, eq, sql } from "drizzle-orm";
+import { CreateTenantForm } from "@/app/admin/tenants/create-tenant-form";
 import { db } from "@/db";
 import { books, memberships, tenants, users } from "@/db/schema";
 import { requirePlatformAdmin } from "@/lib/auth/guards";
@@ -79,6 +80,8 @@ export default async function AdminTenantsPage({
           </button>
         </form>
       </div>
+
+      <CreateTenantForm />
 
       <div className="mt-6 overflow-hidden rounded-lg border border-line bg-card">
         <table className="w-full text-left text-sm">
