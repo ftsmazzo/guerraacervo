@@ -32,6 +32,7 @@ RUN chmod +x ./docker-entrypoint.sh
 COPY --from=deps /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
 COPY --from=deps /app/node_modules/postgres ./node_modules/postgres
 COPY --from=deps /app/node_modules/bcryptjs ./node_modules/bcryptjs
+COPY --from=deps /app/node_modules/jose ./node_modules/jose
 
 RUN chown -R nextjs:nodejs /app
 USER nextjs

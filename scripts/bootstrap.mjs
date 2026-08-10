@@ -1,8 +1,8 @@
 /**
  * Start do container (deploy EasyPanel):
  * 1) espera Postgres
- * 2) aplica migrations Drizzle
- * 3) seed idempotente (user + tenant + membership)
+ * 2) aplica migrations Drizzle (obrigatório)
+ * 3) seed idempotente (não derruba o app se falhar)
  */
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -81,7 +81,7 @@ async function seed(sql) {
         ${"business"},
         ${"business_trial"},
         ${"trialing"},
-        ${trialEnds},
+        ${trialEnds.toISOString()},
         ${true}
       )
       returning id, slug, plan_code
@@ -117,16 +117,20 @@ async function main() {
   try {
     await waitForDb(sql);
     const db = drizzle(sql);
-    console.log("[bootstrap] aplicando migrations…");
+    console.log("[bootstrap] aplicando migrations em", migrationsFolder);
     await migrate(db, { migrationsFolder });
     console.log("[bootstrap] migrations ok");
     if (RUN_SEED) {
-      await seed(sql);
+      try {
+        await seed(sql);
+      } catch (err) {
+        console.error("[bootstrap] seed falhou (app segue):", err);
+      }
     } else {
       console.log("[bootstrap] seed pulado (RUN_SEED=false)");
     }
   } finally {
-    await sql.end({ timeout: 5 });
+    await sql.end({ timeout: 5 }).catch(() => {});
   }
 }
 
