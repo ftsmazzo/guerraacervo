@@ -90,7 +90,7 @@ export async function connectWhatsapp(): Promise<WhatsappActionResult> {
 
     await setInstanceWebhook(cfg, instance).catch(() => null);
 
-    let qr =
+    const qr =
       extractQrBase64(createPayload) ||
       (await waitForQr(cfg, instance, 12, 2000)).qr;
 
