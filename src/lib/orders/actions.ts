@@ -281,8 +281,21 @@ export async function updateOrderStatus(
     });
 
     let message = `Status atualizado para '${novoStatus}'.`;
-    if (vaiDebitar && !jaDebitado) message += " Estoque atualizado.";
-    else if (deveDevolver) message += " Estoque devolvido.";
+    if (vaiDebitar && !jaDebitado) {
+      message += " Estoque atualizado.";
+      try {
+        const { applyPurchaseTagsFromOrder } = await import(
+          "@/lib/whatsapp/queries"
+        );
+        await applyPurchaseTagsFromOrder(
+          tenantId,
+          pedido.clientId,
+          id,
+        );
+      } catch {
+        // tags de compra não bloqueiam status
+      }
+    } else if (deveDevolver) message += " Estoque devolvido.";
 
     revalidatePath("/painel/pedidos");
     revalidatePath(`/painel/pedidos/${id}`);

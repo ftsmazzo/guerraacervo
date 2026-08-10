@@ -215,3 +215,91 @@ export const orderItems = pgTable("order_items", {
     .defaultNow()
     .notNull(),
 });
+
+export const whatsappConnectionStatusEnum = pgEnum(
+  "whatsapp_connection_status",
+  ["disconnected", "qr", "open"],
+);
+
+export const whatsappConnections = pgTable(
+  "whatsapp_connections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    instanceName: varchar("instance_name", { length: 80 }).notNull(),
+    status: whatsappConnectionStatusEnum("status")
+      .notNull()
+      .default("disconnected"),
+    phone: varchar("phone", { length: 30 }),
+    lastQr: text("last_qr"),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("whatsapp_connections_tenant_uidx").on(t.tenantId),
+    uniqueIndex("whatsapp_connections_instance_uidx").on(t.instanceName),
+  ],
+);
+
+export const clientOnboardingStatusEnum = pgEnum("client_onboarding_status", [
+  "pending",
+  "in_progress",
+  "done",
+  "skipped",
+]);
+
+export const clientProfiles = pgTable(
+  "client_profiles",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    optInNotices: boolean("opt_in_notices").notNull().default(false),
+    budgetMin: integer("budget_min"),
+    budgetMax: integer("budget_max"),
+    onboardingStatus: clientOnboardingStatusEnum("onboarding_status")
+      .notNull()
+      .default("pending"),
+    onboardingStep: varchar("onboarding_step", { length: 40 }),
+    rawNotes: text("raw_notes"),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("client_profiles_client_uidx").on(t.clientId),
+  ],
+);
+
+export const interestTagSourceEnum = pgEnum("interest_tag_source", [
+  "declared",
+  "purchase",
+  "engagement",
+]);
+
+export const clientInterestTags = pgTable(
+  "client_interest_tags",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    tag: varchar("tag", { length: 80 }).notNull(),
+    source: interestTagSourceEnum("source").notNull().default("declared"),
+    weight: integer("weight").notNull().default(1),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("client_interest_tags_uidx").on(
+      t.clientId,
+      t.tag,
+      t.source,
+    ),
+  ],
+);

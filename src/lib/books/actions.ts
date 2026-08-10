@@ -153,6 +153,19 @@ export async function createBook(
       .returning({ id: books.id });
     await syncBookTags(ctx.tenant.id, row.id, tagNames);
     revalidatePath("/painel/livros");
+    try {
+      const { enqueueNewBookNotice } = await import("@/lib/whatsapp/notify");
+      await enqueueNewBookNotice({
+        type: "new_book",
+        tenantId: ctx.tenant.id,
+        bookId: row.id,
+        title: values.title,
+        author: values.author,
+        salePrice: String(values.salePrice),
+      });
+    } catch {
+      // notificação não bloqueia cadastro
+    }
     return { ok: true, id: row.id };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
