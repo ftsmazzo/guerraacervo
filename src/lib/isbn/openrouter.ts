@@ -80,6 +80,72 @@ export const BOOK_JSON_SCHEMA = {
   },
 } as const;
 
+/** Vários livros numa única foto (mesa / pilha). */
+export const MULTI_BOOK_JSON_SCHEMA = {
+  name: "ficha_livros_mesa",
+  strict: true,
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      livros: {
+        type: "array",
+        description: "Até 8 livros visíveis na foto (capa ou lombada)",
+        maxItems: 8,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            titulo: { type: "string" },
+            autor: { type: "string" },
+            editora: { type: "string" },
+            ano: { type: "string" },
+            isbn: {
+              type: "string",
+              description:
+                "ISBN só se legível na foto; senão string vazia — NUNCA inventar",
+            },
+            sinopse: { type: "string" },
+            capa: {
+              type: "string",
+              description: "Sempre vazio — capa vem do catálogo depois",
+            },
+            genero: { type: "string" },
+            colecao: { type: "string" },
+            idioma: { type: "string" },
+            paginas: { type: ["integer", "null"] },
+            tipoCapa: { type: "string" },
+            peso: { type: ["integer", "null"] },
+            tags: { type: "array", items: { type: "string" } },
+            confianca: {
+              type: "number",
+              description: "0 a 1 — certeza deste item",
+            },
+          },
+          required: [
+            "titulo",
+            "autor",
+            "editora",
+            "ano",
+            "isbn",
+            "sinopse",
+            "capa",
+            "genero",
+            "colecao",
+            "idioma",
+            "paginas",
+            "tipoCapa",
+            "peso",
+            "tags",
+            "confianca",
+          ],
+        },
+      },
+    },
+    required: ["livros"],
+  },
+} as const;
+
 /** Passagem 2: só resolver ISBN/peso com busca web aberta */
 export const ISBN_LOOKUP_SCHEMA = {
   name: "resolver_isbn",

@@ -335,3 +335,74 @@ export async function saveBook(input: {
   if (!result.ok) throw new Error(result.error);
   return { ok: true, id: result.id };
 }
+
+export type BatchBookSaveItem = {
+  titulo: string;
+  autor?: string | null;
+  editora?: string | null;
+  ano?: number | null;
+  isbn?: string | null;
+  sinopse?: string | null;
+  paginas?: number | null;
+  capaUrl?: string | null;
+  genero?: string | null;
+  idioma?: string | null;
+  peso: number;
+  estado: "Novo" | "Ótimo" | "Bom" | "Regular";
+  tipoCapa?: "Brochura" | "Capa Dura";
+  precoVenda: number;
+  estoque?: number;
+  tags?: string[];
+};
+
+export type CreateBooksBatchResult = {
+  ok: boolean;
+  saved: Array<{ index: number; id: string; titulo: string }>;
+  errors: Array<{ index: number; titulo: string; error: string }>;
+};
+
+/** Grava vários livros; continua se um item falhar. */
+export async function createBooksBatch(
+  items: BatchBookSaveItem[],
+): Promise<CreateBooksBatchResult> {
+  const saved: CreateBooksBatchResult["saved"] = [];
+  const errors: CreateBooksBatchResult["errors"] = [];
+
+  if (!Array.isArray(items) || !items.length) {
+    return { ok: false, saved, errors: [{ index: -1, titulo: "", error: "Nenhum livro." }] };
+  }
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const res = await createBook({
+      isbn: item.isbn,
+      titulo: item.titulo,
+      autor: item.autor,
+      editora: item.editora,
+      ano: item.ano,
+      sinopse: item.sinopse,
+      paginas: item.paginas,
+      capaUrl: item.capaUrl,
+      genero: item.genero,
+      idioma: item.idioma || "Português",
+      peso: item.peso,
+      estado: item.estado,
+      tipoCapa: item.tipoCapa || "Brochura",
+      precoVenda: item.precoVenda,
+      estoque: item.estoque ?? 1,
+      tags: item.tags || [],
+    });
+    if (res.ok) {
+      saved.push({ index: i, id: res.id, titulo: item.titulo });
+    } else {
+      errors.push({
+        index: i,
+        titulo: item.titulo || `(item ${i + 1})`,
+        error: res.error,
+      });
+    }
+  }
+
+  revalidatePath("/painel/livros");
+  return { ok: saved.length > 0, saved, errors };
+}

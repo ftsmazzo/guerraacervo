@@ -163,9 +163,14 @@ export default async function LivrosPage({
               : ""}
           </small>
         </div>
-        <Link href="/painel/livros/novo" className="btn-accent">
-          + Novo Livro
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/painel/livros/lote" className="btn-accent" style={{ background: "transparent", color: "var(--accent)", border: "1px solid var(--accent)" }}>
+            Foto da mesa
+          </Link>
+          <Link href="/painel/livros/novo" className="btn-accent">
+            + Novo Livro
+          </Link>
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: "0.75rem" }}>
