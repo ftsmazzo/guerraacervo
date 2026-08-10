@@ -26,6 +26,11 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const session = await readEdgeSession(request);
 
+  // Scanner mobile via QR — público (auth = token na URL)
+  if (pathname.startsWith("/m/scan")) {
+    return NextResponse.next();
+  }
+
   if (pathname.startsWith("/login")) {
     if (session) {
       const dest = session.isPlatformAdmin ? "/admin" : "/painel";
@@ -59,5 +64,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/painel/:path*", "/admin/:path*", "/login"],
+  matcher: ["/painel/:path*", "/admin/:path*", "/login", "/m/:path*"],
 };

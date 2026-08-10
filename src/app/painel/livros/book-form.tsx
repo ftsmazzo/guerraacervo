@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { BookCapture, type CaptureMode } from "@/components/book-capture";
+import { PhoneQrModal } from "@/components/phone-qr-modal";
 import { createBook, updateBook } from "@/lib/books/actions";
 import { mergeData } from "@/lib/isbn/merge";
 import {
@@ -142,6 +143,8 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
   const [showProgress, setShowProgress] = useState(false);
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureMode, setCaptureMode] = useState<CaptureMode>("barcode");
+  const [phoneQrOpen, setPhoneQrOpen] = useState(false);
+  const pcPhotoRef = useRef<HTMLInputElement>(null);
 
   const [isbn, setIsbn] = useState(initial?.isbn || "");
   const [location, setLocation] = useState(initial?.location || "");
@@ -545,6 +548,10 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     setCaptureOpen(true);
   }
 
+  function openPhoneQr() {
+    setPhoneQrOpen(true);
+  }
+
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -625,69 +632,97 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
         </Link>
       </div>
 
-      <div className="card mb-4" style={{ borderLeft: "3px solid var(--accent)" }}>
+      <div className="card mb-4 isbn-lookup-card">
         <div className="card-body">
-          <div className="mb-3 flex flex-wrap items-center gap-3">
-            <div
-              style={{
-                width: 42,
-                height: 42,
-                background: "var(--accent-soft)",
-                borderRadius: 8,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--accent)",
-                fontWeight: 700,
-              }}
-            >
-              ISBN
-            </div>
-            <div style={{ flex: 1 }}>
-              <div className="text-sm font-semibold">Busca por ISBN ou título</div>
-              <div className="text-xs text-muted">
-                Digite, escaneie o código ou fotografe a capa no celular
+          <div className="isbn-lookup-top">
+            <div className="isbn-lookup-icon">ISBN</div>
+            <div className="isbn-lookup-copy">
+              <div className="isbn-lookup-title">Identificar o livro</div>
+              <div className="isbn-lookup-sub">
+                Três caminhos: teclado neste PC, webcam deste PC, ou celular via QR
               </div>
             </div>
           </div>
 
-          <button
-            type="button"
-            className="btn-accent book-capture-cta mb-3 w-full sm:w-auto"
-            onClick={() => openCapture("barcode")}
-          >
-            Capturar com a câmera
-          </button>
-          <div className="mb-3 flex flex-wrap gap-2 text-xs">
-            <button
-              type="button"
-              className="rounded-md border border-line px-3 py-1.5 text-muted hover:text-ink"
-              onClick={() => openCapture("barcode")}
-            >
-              Só código de barras
-            </button>
-            <button
-              type="button"
-              className="rounded-md border border-line px-3 py-1.5 text-muted hover:text-ink"
-              onClick={() => openCapture("cover")}
-            >
-              Só foto da capa
-            </button>
-          </div>
+          <div className="isbn-worlds">
+            <div className="isbn-world">
+              <div className="isbn-world-label">1 · Teclado / arquivo</div>
+              <div className="isbn-input-group">
+                <input
+                  value={isbnBusca}
+                  onChange={(e) => setIsbnBusca(e.target.value)}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && (e.preventDefault(), void buscarISBN())
+                  }
+                  className="form-control"
+                  placeholder="ISBN ou título…"
+                  maxLength={120}
+                />
+                <button
+                  type="button"
+                  className="btn-accent"
+                  onClick={() => void buscarISBN()}
+                >
+                  Buscar
+                </button>
+                <button
+                  type="button"
+                  className="btn-outline"
+                  title="Carregar foto da capa neste computador"
+                  onClick={() => pcPhotoRef.current?.click()}
+                >
+                  Foto
+                </button>
+              </div>
+              <input
+                ref={pcPhotoRef}
+                type="file"
+                accept="image/*"
+                className="book-capture-file-input"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) void buscarIAFoto(f);
+                }}
+              />
+            </div>
 
-          <div className="flex flex-wrap gap-2" style={{ flex: "1 1 280px" }}>
-            <input
-              value={isbnBusca}
-              onChange={(e) => setIsbnBusca(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), void buscarISBN())}
-              className="form-control"
-              placeholder="ISBN ou título (ex: 48 leis do poder)"
-              maxLength={120}
-              style={{ flex: 1 }}
-            />
-            <button type="button" className="btn-accent" onClick={() => void buscarISBN()}>
-              Buscar
-            </button>
+            <div className="isbn-world">
+              <div className="isbn-world-label">2 · Webcam deste PC</div>
+              <div className="isbn-world-actions">
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={() => openCapture("barcode")}
+                  title="Ler código de barras na webcam"
+                >
+                  Código
+                </button>
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={() => openCapture("cover")}
+                  title="Fotografar capa na webcam"
+                >
+                  Capa
+                </button>
+              </div>
+            </div>
+
+            <div className="isbn-world">
+              <div className="isbn-world-label">3 · Celular (QR)</div>
+              <button
+                type="button"
+                className="btn-phone"
+                onClick={openPhoneQr}
+                title="Abrir QR para o celular ler e enviar ao PC"
+              >
+                Usar celular
+              </button>
+              <p className="isbn-world-hint">
+                O PC fica aberto; o celular só lê e devolve o dado.
+              </p>
+            </div>
           </div>
 
           {showProgress ? (
@@ -703,16 +738,12 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
             </div>
           ) : null}
           {isbnMsg ? (
-            <div className="mt-3 rounded-md border border-line bg-accent-soft px-3 py-2 text-sm text-accent-text">
-              {isbnMsg}
-            </div>
+            <div className="isbn-msg mt-3">{isbnMsg}</div>
           ) : null}
 
-          <div className="mt-4 border-t border-line pt-3">
-            <div className="mb-1 text-xs font-semibold text-muted">
-              IA · descrição / título (OpenRouter + web)
-            </div>
-            <div className="flex gap-2">
+          <details className="isbn-ai-details mt-3">
+            <summary>IA por texto (opcional)</summary>
+            <div className="isbn-input-group mt-2">
               <input
                 className="form-control"
                 value={aiQuery}
@@ -727,13 +758,13 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
               />
               <button
                 type="button"
-                className="rounded-md border border-line px-3 py-2 text-sm"
+                className="btn-outline"
                 onClick={() => void buscarIATexto()}
               >
                 IA
               </button>
             </div>
-          </div>
+          </details>
         </div>
       </div>
 
@@ -742,6 +773,18 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
         open={captureOpen}
         initialMode={captureMode}
         onClose={() => setCaptureOpen(false)}
+        onIsbn={(code) => {
+          setIsbnBusca(code);
+          void buscarISBN(code);
+        }}
+        onCoverPhoto={(dataUrl) => {
+          void buscarIAFoto(dataUrl);
+        }}
+      />
+
+      <PhoneQrModal
+        open={phoneQrOpen}
+        onClose={() => setPhoneQrOpen(false)}
         onIsbn={(code) => {
           setIsbnBusca(code);
           void buscarISBN(code);

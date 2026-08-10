@@ -63,27 +63,29 @@
 
 .livros-page .form-label {
   display: block;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--muted-2);
-  margin-bottom: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 0.28rem;
 }
 
 .livros-page .form-control,
 .livros-page .form-select {
   width: 100%;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: 6px;
-  padding: 0.45rem 0.65rem;
+  padding: 0.5rem 0.7rem;
   font-size: 0.875rem;
-  background: var(--background);
+  background: #fff;
   color: var(--ink);
+  box-shadow: inset 0 1px 2px rgba(28, 25, 23, 0.04);
 }
 
 .livros-page .form-control:focus,
 .livros-page .form-select:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .livros-page .form-text {
@@ -468,4 +470,252 @@
   .book-capture-cta {
     width: 100%;
   }
+}
+
+/* Três mundos ISBN (estilo Renato) */
+.livros-page .isbn-lookup-card {
+  border-left: 3px solid var(--accent);
+}
+
+.livros-page .isbn-lookup-top {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.livros-page .isbn-lookup-icon {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  background: var(--accent-soft);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.72rem;
+}
+
+.livros-page .isbn-lookup-title {
+  font-size: 0.92rem;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.livros-page .isbn-lookup-sub {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.livros-page .isbn-worlds {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 900px) {
+  .livros-page .isbn-worlds {
+    grid-template-columns: 1.4fr 0.8fr 0.9fr;
+    align-items: start;
+  }
+}
+
+.livros-page .isbn-world {
+  border: 1px solid var(--line);
+  background: #fffcf8;
+  border-radius: 8px;
+  padding: 0.7rem 0.75rem;
+}
+
+.livros-page .isbn-world-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+  margin-bottom: 0.45rem;
+}
+
+.livros-page .isbn-world-hint {
+  margin: 0.4rem 0 0;
+  font-size: 0.7rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.livros-page .isbn-input-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.livros-page .isbn-input-group .form-control {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.livros-page .isbn-world-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.livros-page .btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-strong);
+  background: #fff;
+  color: var(--ink);
+  border-radius: var(--radius);
+  padding: 0.45rem 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.livros-page .btn-outline:hover {
+  border-color: var(--accent);
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
+
+.livros-page .btn-phone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border: 1.5px solid #f0b429;
+  background: #fffbeb;
+  color: #92400e;
+  border-radius: var(--radius);
+  padding: 0.55rem 0.85rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.livros-page .btn-phone:hover {
+  background: #fef3c7;
+}
+
+.livros-page .isbn-msg {
+  border: 1px solid var(--line);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.84rem;
+}
+
+.livros-page .isbn-ai-details {
+  border-top: 1px solid var(--line);
+  padding-top: 0.65rem;
+}
+
+.livros-page .isbn-ai-details summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.livros-page .isbn-ai-details summary:hover {
+  color: var(--ink);
+}
+
+/* Modal QR celular → PC */
+.phone-qr-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(28, 25, 23, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.phone-qr-dialog {
+  background: var(--card);
+  border-radius: 12px;
+  width: min(380px, 100%);
+  padding: 1rem 1.1rem 1.15rem;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
+}
+
+.phone-qr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.phone-qr-close {
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: 8px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.phone-qr-help {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.phone-qr-error {
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+  border-radius: 8px;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.8rem;
+  margin-bottom: 0.65rem;
+}
+
+.phone-qr-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.75rem;
+  min-height: 236px;
+}
+
+.phone-qr-loading {
+  color: var(--muted);
+  font-size: 1.5rem;
+}
+
+.phone-qr-status {
+  margin: 0.75rem 0 0.25rem;
+  text-align: center;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--accent-text);
+}
+
+.phone-qr-url {
+  margin: 0;
+  text-align: center;
+  font-size: 0.65rem;
+  color: var(--muted);
+  word-break: break-all;
+  opacity: 0.8;
+}
+
+.phone-qr-note {
+  margin: 0.65rem 0 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: center;
 }

@@ -351,7 +351,7 @@ export function BookCapture({
       <div className="book-capture-sheet">
         <header className="book-capture-header">
           <div>
-            <strong>Capturar</strong>
+            <strong>Webcam deste PC</strong>
             <p className="book-capture-hint">{hint}</p>
           </div>
           <button
