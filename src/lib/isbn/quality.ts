@@ -395,16 +395,7 @@ async function fromOpenLibrary(
   return out;
 }
 
-/**
- * Busca várias fontes e devolve o melhor “pacote” + melhores campos
- * individuais (sinopse PT longa, páginas, etc.).
- */
-export async function fetchBestCatalogEnrichment(input: {
-  titulo: string;
-  autor?: string;
-  editora?: string;
-  isbn13?: string;
-}): Promise<{
+export type EnrichmentBundle = {
   best: CatalogSnippet | null;
   bestSinopse: string;
   bestPaginas: number | null;
@@ -415,26 +406,11 @@ export async function fetchBestCatalogEnrichment(input: {
   bestEditora: string;
   bestTags: string[];
   fontes: string[];
-}> {
-  const queries: string[] = [];
-  if (input.isbn13) queries.push(`isbn:${input.isbn13}`);
-  queries.push(
-    [input.titulo, input.autor, input.editora].filter(Boolean).join(" "),
-  );
-  if (input.editora) {
-    queries.push(`intitle:${input.titulo} inpublisher:${input.editora}`);
-  }
-  queries.push(`intitle:${input.titulo}`);
+  stage: string;
+};
 
-  const chunks = await Promise.all([
-    ...queries.slice(0, 3).map((q) => fromGoogleBooks(q, input.titulo)),
-    fromOpenLibrary(input.isbn13, input.titulo),
-    fromOpenLibraryWork(input.titulo).then((x) => (x ? [x] : [])),
-    fromWikipediaPt(input.titulo, input.autor).then((x) => (x ? [x] : [])),
-  ]);
-  const all = chunks.flat();
+function mergeSnippets(all: CatalogSnippet[]): EnrichmentBundle {
   all.sort((a, b) => b.quality - a.quality);
-
   const best = all[0] || null;
   const bestSinopse =
     all
@@ -444,40 +420,132 @@ export async function fetchBestCatalogEnrichment(input: {
     best?.sinopse ||
     "";
 
-  const bestPaginas =
-    all.map((s) => s.paginas).find((p) => p && p > 0) || null;
-
-  const bestIdioma =
-    all.find((s) => /portug/i.test(s.idioma))?.idioma ||
-    best?.idioma ||
-    "";
-
-  const bestGenero =
-    all
-      .map((s) => s.genero)
-      .find((g) => g && !looksLikeEnglish(g) && g.length > 2) ||
-    best?.genero ||
-    "";
-
-  const bestCapa = all.map((s) => s.capa).find((c) => !!c) || "";
-  const bestAno = all.map((s) => s.ano).find((a) => /^\d{4}$/.test(a)) || "";
-  const bestEditora =
-    all.map((s) => s.editora).find((e) => e && e.length > 2) || "";
-
-  const bestTags = processarTags(all.flatMap((s) => s.tags)).slice(0, 10);
-
   return {
     best,
     bestSinopse,
-    bestPaginas,
-    bestIdioma,
-    bestGenero,
-    bestCapa,
-    bestAno,
-    bestEditora,
-    bestTags,
-    fontes: [...new Set(all.slice(0, 5).map((s) => s.fonte))],
+    bestPaginas: all.map((s) => s.paginas).find((p) => p && p > 0) || null,
+    bestIdioma:
+      all.find((s) => /portug/i.test(s.idioma))?.idioma || best?.idioma || "",
+    bestGenero:
+      all
+        .map((s) => s.genero)
+        .find((g) => g && !looksLikeEnglish(g) && g.length > 2) ||
+      best?.genero ||
+      "",
+    bestCapa: all.map((s) => s.capa).find((c) => !!c) || "",
+    bestAno: all.map((s) => s.ano).find((a) => /^\d{4}$/.test(a)) || "",
+    bestEditora:
+      all.map((s) => s.editora).find((e) => e && e.length > 2) || "",
+    bestTags: processarTags(all.flatMap((s) => s.tags)).slice(0, 10),
+    fontes: [...new Set(all.slice(0, 6).map((s) => s.fonte))],
+    stage: "",
   };
+}
+
+/** Critério mínimo para “fechar” a devolutiva sem ampliar mais */
+export function isEnrichmentSatisfied(input: {
+  sinopse: string;
+  paginas: number | null;
+  idioma?: string;
+}): boolean {
+  const hasSinopse = !isPoorSynopsis(input.sinopse);
+  const hasPages = !!(input.paginas && input.paginas > 0);
+  const idiomaOk =
+    !input.idioma ||
+    /portug/i.test(input.idioma) ||
+    input.idioma.trim() === "";
+  return hasSinopse && hasPages && idiomaOk;
+}
+
+/**
+ * Busca em ondas: estreita → amplia → ampla.
+ * Para assim que sinopse boa + páginas existirem (melhor custo/latência).
+ */
+export async function fetchBestCatalogEnrichment(input: {
+  titulo: string;
+  autor?: string;
+  editora?: string;
+  isbn13?: string;
+}): Promise<EnrichmentBundle> {
+  const collected: CatalogSnippet[] = [];
+  const seen = new Set<string>();
+
+  const add = (items: CatalogSnippet[]) => {
+    for (const it of items) {
+      const key = `${it.fonte}|${it.titulo}|${it.sinopse.slice(0, 40)}|${it.paginas}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      collected.push(it);
+    }
+  };
+
+  const snapshot = (stage: string): EnrichmentBundle => {
+    const bundle = mergeSnippets([...collected]);
+    bundle.stage = stage;
+    return bundle;
+  };
+
+  const goodEnough = () => {
+    const b = mergeSnippets([...collected]);
+    return isEnrichmentSatisfied({
+      sinopse: b.bestSinopse,
+      paginas: b.bestPaginas,
+      idioma: b.bestIdioma,
+    });
+  };
+
+  // —— Onda 1: preciso (ISBN + título+autor+editora) ——
+  const wave1Queries = [
+    input.isbn13 ? `isbn:${input.isbn13}` : "",
+    input.editora
+      ? `intitle:${input.titulo} inpublisher:${input.editora}`
+      : "",
+    [input.titulo, input.autor, input.editora].filter(Boolean).join(" "),
+  ].filter(Boolean);
+
+  add(
+    (
+      await Promise.all(
+        wave1Queries.map((q) => fromGoogleBooks(q, input.titulo)),
+      )
+    ).flat(),
+  );
+  if (input.isbn13) {
+    add(await fromOpenLibrary(input.isbn13, undefined));
+  }
+  if (goodEnough()) {
+    const b = snapshot("onda1-precisa");
+    return b;
+  }
+
+  // —— Onda 2: amplia catálogos ——
+  add(await fromGoogleBooks(`intitle:${input.titulo}`, input.titulo));
+  add(await fromOpenLibrary(undefined, input.titulo));
+  const work = await fromOpenLibraryWork(input.titulo);
+  if (work) add([work]);
+  if (goodEnough()) {
+    return snapshot("onda2-catalogos");
+  }
+
+  // —— Onda 3: fontes amplas (Wikipedia + queries soltas) ——
+  const wiki = await fromWikipediaPt(input.titulo, input.autor);
+  if (wiki) add([wiki]);
+  add(
+    await fromGoogleBooks(
+      `${input.titulo} ${input.autor || ""} livro`.trim(),
+      input.titulo,
+    ),
+  );
+  if (input.autor) {
+    add(
+      await fromGoogleBooks(
+        `intitle:${input.titulo} inauthor:${input.autor}`,
+        input.titulo,
+      ),
+    );
+  }
+
+  return snapshot("onda3-ampla");
 }
 
 /** Aplica enriquecimento só onde o atual está pobre / vazio */
@@ -493,7 +561,7 @@ export function applyBestEnrichment<
     tags: string[];
     avisos: string[];
   },
->(result: T, enrich: Awaited<ReturnType<typeof fetchBestCatalogEnrichment>>) {
+>(result: T, enrich: EnrichmentBundle) {
   let upgraded = 0;
 
   if (
@@ -552,7 +620,7 @@ export function applyBestEnrichment<
 
   if (upgraded > 0 && enrich.fontes.length) {
     result.avisos.push(
-      `Detalhes reforçados com ${enrich.fontes.join(" + ")} (melhor qualidade).`,
+      `Detalhes reforçados (${enrich.stage}) via ${enrich.fontes.join(" + ")}.`,
     );
   }
 

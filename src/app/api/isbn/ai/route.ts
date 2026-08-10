@@ -23,7 +23,7 @@ import {
 import {
   applyBestEnrichment,
   fetchBestCatalogEnrichment,
-  isPoorSynopsis,
+  isEnrichmentSatisfied,
 } from "@/lib/isbn/quality";
 
 export const dynamic = "force-dynamic";
@@ -146,7 +146,31 @@ async function enrichIsbnAndWeight(
   cfg: ReturnType<typeof resolveOpenRouterConfig>,
   webSearch: boolean,
 ): Promise<void> {
-  // 1) Se IA trouxe ISBN, validar em catálogo
+  const fichaOk = () =>
+    isEnrichmentSatisfied({
+      sinopse: result.sinopse,
+      paginas: result.paginas,
+      idioma: result.idioma,
+    });
+
+  const applyCatalog = async (label: string) => {
+    try {
+      const enrich = await fetchBestCatalogEnrichment({
+        titulo: result.titulo,
+        autor: result.autor,
+        editora: result.editora,
+        isbn13: result.isbnConfirmado ? result.isbn : undefined,
+      });
+      const n = applyBestEnrichment(result, enrich);
+      if (n > 0) {
+        result.avisos.push(`Catálogo ${label}: +${n} campo(s).`);
+      }
+    } catch {
+      result.avisos.push(`Catálogo ${label} indisponível.`);
+    }
+  };
+
+  // —— Etapa A: validar ISBN da IA ——
   if (result.isbn) {
     const verified = await verifyIsbnExists(result.isbn);
     if (verified.ok) {
@@ -161,14 +185,17 @@ async function enrichIsbnAndWeight(
       if (!result.editora && verified.editora) result.editora = verified.editora;
     } else {
       result.avisos.push(
-        `ISBN ${result.isbn} inválido/ausente nos catálogos — buscando pela ficha…`,
+        `ISBN ${result.isbn} inválido/ausente nos catálogos — ampliando busca…`,
       );
       result.isbn = "";
       result.isbnConfirmado = false;
     }
   }
 
-  // 2) Resolver ISBN por título+editora+autor (estilo busca Google)
+  // —— Etapa B: catálogo progressivo (onda 1→3 até sinopse+páginas) ——
+  await applyCatalog("inicial");
+
+  // —— Etapa C: se ainda sem ISBN, resolve por metadados ——
   if (!result.isbnConfirmado) {
     const hit = await resolveIsbnByMetadata({
       titulo: result.titulo,
@@ -187,128 +214,141 @@ async function enrichIsbnAndWeight(
       if (!result.peso && hit.peso) result.peso = hit.peso;
       if (!result.editora && hit.editora) result.editora = hit.editora;
       if (!result.ano && hit.ano) result.ano = hit.ano;
-      result.avisos.push(`ISBN resolvido via ${hit.fonte} (score ${hit.score.toFixed(0)}).`);
+      result.avisos.push(
+        `ISBN resolvido via ${hit.fonte} (score ${hit.score.toFixed(0)}).`,
+      );
+      // Com ISBN novo, amplia de novo (costuma liberar páginas/sinopse)
+      await applyCatalog("pos-isbn");
     }
   }
 
-  // 3) Segunda passagem IA: busca web ABERTA só para ISBN (como você fez no Google)
-  if (!result.isbnConfirmado && webSearch && cfg.apiKey) {
-    try {
-      const { content } = await openRouterChat({
-        apiKey: cfg.apiKey,
-        appUrl: cfg.appUrl,
-        model: cfg.model,
-        fallbacks: cfg.fallbacks,
-        webSearch: true,
-        temperature: 0.05,
-        jsonSchema: ISBN_LOOKUP_SCHEMA,
-        webOpts: {
-          unrestricted: true,
-          maxResults: 8,
-          searchPrompt:
-            "Encontre páginas que cite ISBN da edição brasileira (título + editora + coleção). Liste ISBN-13/ISBN-10 explícitos. Inclua peso em gramas se houver.",
-        },
-        messages: [
-          {
-            role: "system",
-            content: `Você pesquisa ISBN como um sebo brasileiro.
-- Só devolva ISBN que apareça escrito na fonte.
-- Se houver várias edições da mesma editora, prefira a da coleção informada; edições escolares/adaptação antigas costumam ter ISBN-10 8526… 
-- Não invente. Se incerto, isbn="".`,
+  // —— Etapa D: ainda incompleto → web aberta (ISBN) e nova passagem de catálogo ——
+  if (
+    (!result.isbnConfirmado || !fichaOk()) &&
+    webSearch &&
+    cfg.apiKey
+  ) {
+    if (!result.isbnConfirmado) {
+      try {
+        const { content } = await openRouterChat({
+          apiKey: cfg.apiKey,
+          appUrl: cfg.appUrl,
+          model: cfg.model,
+          fallbacks: cfg.fallbacks,
+          webSearch: true,
+          temperature: 0,
+          jsonSchema: ISBN_LOOKUP_SCHEMA,
+          webOpts: {
+            unrestricted: true,
+            maxResults: 8,
+            searchPrompt:
+              "Encontre páginas que cite ISBN da edição brasileira (título + editora + coleção). Liste ISBN-13/ISBN-10 explícitos. Inclua peso em gramas se houver.",
           },
-          {
-            role: "user",
-            content: `Qual o ISBN desta edição?
+          messages: [
+            {
+              role: "system",
+              content: `Você pesquisa ISBN como um sebo brasileiro.
+- Só devolva ISBN que apareça escrito na fonte.
+- Se houver várias edições da mesma editora, prefira a da coleção informada.
+- Não invente. Se incerto, isbn="".`,
+            },
+            {
+              role: "user",
+              content: `Qual o ISBN desta edição?
 Título: ${result.titulo}
 Autor: ${result.autor || "—"}
 Editora: ${result.editora || "—"}
 Coleção: ${result.colecao || "—"}
 Ano: ${result.ano || "—"}
 
-Consultas sugeridas:
+Consultas:
 1) ISBN ${result.titulo} ${result.editora}
 2) ISBN ${result.titulo} ${result.colecao} ${result.editora}
 3) ${result.titulo} ${result.editora} 97885`,
-          },
-        ],
-      });
-      const second = parseAiJson(content);
-      const candidates = new Set<string>();
-      const primary = cleanIsbn(second.isbn);
-      if (primary) candidates.add(primary);
-      // Extrai outros ISBNs mencionados no JSON/texto (ex.: edição antiga vs nova)
-      const blob = content + " " + JSON.stringify(second);
-      for (const m of blob.match(/\b97[89]\d{10}\b|\b\d{9}[\dXx]\b/gi) || []) {
-        const c = cleanIsbn(m);
-        if (c) candidates.add(c);
-      }
-
-      let chosen: string | null = null;
-      let chosenMeta: Awaited<ReturnType<typeof verifyIsbnExists>> | null =
-        null;
-      // Prefere 97885 (BR) e depois qualquer confirmado
-      const ordered = [...candidates].sort((a, b) => {
-        const br = (x: string) => (x.startsWith("97885") ? 0 : 1);
-        return br(a) - br(b);
-      });
-      for (const cand of ordered) {
-        const verified = await verifyIsbnExists(cand);
-        if (verified.ok) {
-          chosen = verified.isbn13;
-          chosenMeta = verified;
-          break;
+            },
+          ],
+        });
+        const second = parseAiJson(content);
+        const candidates = new Set<string>();
+        const primary = cleanIsbn(second.isbn);
+        if (primary) candidates.add(primary);
+        const blob = content + " " + JSON.stringify(second);
+        for (const m of blob.match(/\b97[89]\d{10}\b|\b\d{9}[\dXx]\b/gi) || []) {
+          const c = cleanIsbn(m);
+          if (c) candidates.add(c);
         }
-      }
 
-      // Catálogos internacionais muitas vezes NÃO têm ISBN escolar Scipione.
-      // Se o checksum é válido e a IA apontou fonte, aceita com aviso.
-      if (!chosen && primary && isValidIsbnChecksum(primary.replace(/[^\dXx]/gi, ""))) {
-        chosen = primary;
-        result.avisos.push(
-          `ISBN ${primary} aceito pela busca web (não indexado no Google Books/OL). Confira na capa/código de barras.`,
-        );
-      }
-
-      if (chosen) {
-        result.isbn = chosen;
-        result.isbnConfirmado = true;
+        let chosen: string | null = null;
+        let chosenMeta: Awaited<ReturnType<typeof verifyIsbnExists>> | null =
+          null;
+        const ordered = [...candidates].sort((a, b) => {
+          const br = (x: string) => (x.startsWith("97885") ? 0 : 1);
+          return br(a) - br(b);
+        });
+        for (const cand of ordered) {
+          const verified = await verifyIsbnExists(cand);
+          if (verified.ok) {
+            chosen = verified.isbn13;
+            chosenMeta = verified;
+            break;
+          }
+        }
         if (
-          !result.capa &&
-          (isPlausibleCoverUrl(String(second.capa || "")) ||
-            chosenMeta?.capa)
+          !chosen &&
+          primary &&
+          isValidIsbnChecksum(primary.replace(/[^\dXx]/gi, ""))
         ) {
-          result.capa =
-            (isPlausibleCoverUrl(String(second.capa || ""))
-              ? String(second.capa)
-              : "") ||
-            chosenMeta?.capa ||
-            "";
-          if (result.capa) result.capaOrigem = "catalogo";
+          chosen = primary;
+          result.avisos.push(
+            `ISBN ${primary} aceito pela busca web (fora do Google Books/OL). Confira na capa.`,
+          );
         }
-        if (!result.paginas) {
-          result.paginas =
-            (typeof second.paginas === "number" ? second.paginas : null) ||
-            chosenMeta?.paginas ||
-            null;
+
+        if (chosen) {
+          result.isbn = chosen;
+          result.isbnConfirmado = true;
+          if (
+            !result.capa &&
+            (isPlausibleCoverUrl(String(second.capa || "")) ||
+              chosenMeta?.capa)
+          ) {
+            result.capa =
+              (isPlausibleCoverUrl(String(second.capa || ""))
+                ? String(second.capa)
+                : "") ||
+              chosenMeta?.capa ||
+              "";
+            if (result.capa) result.capaOrigem = "catalogo";
+          }
+          if (!result.paginas) {
+            result.paginas =
+              (typeof second.paginas === "number" ? second.paginas : null) ||
+              chosenMeta?.paginas ||
+              null;
+          }
+          if (!result.peso) {
+            result.peso =
+              (typeof second.peso === "number" && second.peso > 0
+                ? second.peso
+                : null) ||
+              chosenMeta?.peso ||
+              null;
+          }
+          result.avisos.push(
+            `ISBN via web (${String(second.fonte || "busca aberta")}).`,
+          );
+          await applyCatalog("pos-web");
         }
-        if (!result.peso) {
-          result.peso =
-            (typeof second.peso === "number" && second.peso > 0
-              ? second.peso
-              : null) ||
-            chosenMeta?.peso ||
-            null;
-        }
-        result.avisos.push(
-          `ISBN via web (${String(second.fonte || "busca aberta")}).`,
-        );
+      } catch {
+        result.avisos.push("Busca web de ISBN indisponível neste momento.");
       }
-    } catch {
-      result.avisos.push("Busca web de ISBN indisponível neste momento.");
+    } else if (!fichaOk()) {
+      // Tem ISBN mas ficha pobre → mais uma passada de catálogo amplo
+      await applyCatalog("reforco");
     }
   }
 
-  // 4) Capa por título se ainda faltar (nunca placeholder OL /b/isbn/)
+  // —— Etapa E: capa ——
   if (
     !result.capa ||
     result.capa.includes("covers.openlibrary.org/b/isbn/")
@@ -330,44 +370,24 @@ Consultas sugeridas:
     }
   }
 
-  // 5) Peso: catálogo > estimativa por páginas (obrigatório no sebo)
-  if (!result.peso) {
+  // —— Etapa F: peso ——
+  if (!result.peso || result.pesoEstimado) {
     const est = estimateWeightGrams(result.paginas, result.tipoCapa);
-    if (est) {
+    if (est && (!result.peso || result.pesoEstimado)) {
       result.peso = est;
       result.pesoEstimado = true;
-      result.avisos.push(`Peso estimado ~${est}g (páginas/tipo de capa).`);
+      if (!result.avisos.some((a) => a.includes("Peso estimado"))) {
+        result.avisos.push(`Peso estimado ~${est}g (páginas/tipo de capa).`);
+      }
     }
   }
 
-  // 6) Sempre cruzar catálogos e ficar com o MELHOR de cada campo
-  // (mata a instabilidade: IA identifica; fontes ricas completam)
-  try {
-    const enrich = await fetchBestCatalogEnrichment({
-      titulo: result.titulo,
-      autor: result.autor,
-      editora: result.editora,
-      isbn13: result.isbnConfirmado ? result.isbn : undefined,
-    });
-    const n = applyBestEnrichment(result, enrich);
-    if (
-      n === 0 &&
-      (isPoorSynopsis(result.sinopse) || !result.paginas)
-    ) {
-      result.avisos.push(
-        "Catálogos sem sinopse/páginas fortes para esta edição — confira manualmente.",
-      );
-    }
-    // Recalcula peso se páginas chegaram agora
-    if ((!result.peso || result.pesoEstimado) && result.paginas) {
-      const est = estimateWeightGrams(result.paginas, result.tipoCapa);
-      if (est && (!result.peso || result.pesoEstimado)) {
-        result.peso = est;
-        result.pesoEstimado = true;
-      }
-    }
-  } catch {
-    result.avisos.push("Enriquecimento de catálogo indisponível nesta tentativa.");
+  if (!fichaOk()) {
+    result.avisos.push(
+      "Ficha ainda parcial após ampliar fontes — revise sinopse/páginas se preciso.",
+    );
+  } else {
+    result.avisos.push("Ficha completa (sinopse + páginas) após busca progressiva.");
   }
 }
 
