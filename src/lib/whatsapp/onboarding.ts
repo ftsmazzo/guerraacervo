@@ -1,17 +1,9 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { clientProfiles, clients } from "@/db/schema";
-import {
-  normalizePhone,
-  resolveEvolutionConfig,
-  sendTextMessage,
-} from "@/lib/whatsapp/evolution";
-import {
-  findClientByWhatsapp,
-  getConnectionByInstance,
-  getOrCreateClientProfile,
-  upsertInterestTags,
-} from "@/lib/whatsapp/queries";
+import { clientProfiles } from "@/db/schema";
+import type { EvolutionConfig } from "@/lib/whatsapp/evolution";
+import { sendTextMessage } from "@/lib/whatsapp/evolution";
+import { upsertInterestTags } from "@/lib/whatsapp/queries";
 
 type Step =
   | "welcome"
@@ -40,57 +32,23 @@ function isNo(text: string) {
   return /^(n|nao|não|no|nunca|depois)\b/i.test(text.trim());
 }
 
-export async function handleInboundMessage(opts: {
+export async function runOnboardingFlow(opts: {
+  cfg: EvolutionConfig;
+  tenantId: string;
   instanceName: string;
-  remoteJid: string;
+  phone: string;
+  client: { id: string; name: string };
+  profile: {
+    id: string;
+    budgetMin: number | null;
+    budgetMax: number | null;
+    optInNotices: boolean;
+    onboardingStep: string | null;
+  };
   text: string;
   pushName?: string;
 }) {
-  const cfg = resolveEvolutionConfig();
-  if (!cfg) return;
-
-  const conn = await getConnectionByInstance(opts.instanceName);
-  if (!conn) return;
-
-  // ignore groups / status
-  if (opts.remoteJid.includes("@g.us") || opts.remoteJid === "status@broadcast") {
-    return;
-  }
-
-  const phone = normalizePhone(opts.remoteJid.split("@")[0] || "");
-  if (!phone) return;
-
-  let client = await findClientByWhatsapp(conn.tenantId, phone);
-  if (!client) {
-    const name =
-      opts.pushName?.trim() ||
-      `Cliente WhatsApp ${phone.slice(-4)}`;
-    const [created] = await db
-      .insert(clients)
-      .values({
-        tenantId: conn.tenantId,
-        name,
-        whatsapp: phone,
-      })
-      .returning();
-    client = created;
-  }
-
-  const profile = await getOrCreateClientProfile(conn.tenantId, client.id);
-  if (profile.onboardingStatus === "done" || profile.onboardingStatus === "skipped") {
-    // fase 1: só confirma
-    if (/ajuda|menu|oi|olá|ola/i.test(opts.text)) {
-      await sendTextMessage(
-        cfg,
-        conn.instanceName,
-        phone,
-        `Olá, ${client.name.split(" ")[0]}! Seu perfil já está salvo. Em breve indico livros sob medida 📚`,
-      );
-    }
-    return;
-  }
-
-  const step = (profile.onboardingStep as Step) || "welcome";
+  const step = (opts.profile.onboardingStep as Step) || "welcome";
   const text = opts.text.trim();
 
   let reply = "";
@@ -101,7 +59,6 @@ export async function handleInboundMessage(opts: {
     budgetMin: number | null;
     budgetMax: number | null;
     optInNotices: boolean;
-    rawNotes: string | null;
   }> = {};
 
   if (step === "welcome") {
@@ -113,7 +70,7 @@ export async function handleInboundMessage(opts: {
   } else if (step === "genres") {
     const tags = parseTags(text);
     if (tags.length) {
-      await upsertInterestTags(conn.tenantId, client.id, tags, "declared", 3);
+      await upsertInterestTags(opts.tenantId, opts.client.id, tags, "declared", 3);
     }
     reply =
       `Anotado!\n\n2) Tem *autores ou temas* preferidos? (pode listar separados por vírgula)`;
@@ -121,7 +78,7 @@ export async function handleInboundMessage(opts: {
   } else if (step === "themes") {
     const tags = parseTags(text);
     if (tags.length) {
-      await upsertInterestTags(conn.tenantId, client.id, tags, "declared", 2);
+      await upsertInterestTags(opts.tenantId, opts.client.id, tags, "declared", 2);
     }
     reply =
       `Perfeito.\n\n3) Qual sua *faixa de preço* usual? (ex.: até 40, ou 20 a 60)`;
@@ -134,11 +91,10 @@ export async function handleInboundMessage(opts: {
       `4) Posso te avisar no WhatsApp quando entrar *livro novo* no seu gosto? (sim/não)`;
     nextStep = "optin";
   } else if (step === "optin") {
-      profilePatch.optInNotices = !isNo(text);
-      reply = isNo(text)
-        ? `Tudo bem! Perfil salvo. Quando quiser avisos, é só falar. Bom proveito 📖`
-        : `Combinado! Vou te avisar das novidades. Perfil pronto — obrigado! 🙌`;
-
+    profilePatch.optInNotices = !isNo(text);
+    reply = isNo(text)
+      ? `Tudo bem! Perfil pronto. Pode pedir *indicações*, buscar um título ou *menu*.`
+      : `Combinado! Vou te avisar das novidades. Perfil pronto — peça *indicações* ou diga o que procura 📖`;
     nextStep = "done";
     onboardingStatus = "done";
   } else {
@@ -150,15 +106,14 @@ export async function handleInboundMessage(opts: {
     .set({
       onboardingStatus,
       onboardingStep: nextStep,
-      budgetMin: profilePatch.budgetMin ?? profile.budgetMin,
-      budgetMax: profilePatch.budgetMax ?? profile.budgetMax,
-      optInNotices:
-        profilePatch.optInNotices ?? profile.optInNotices,
+      budgetMin: profilePatch.budgetMin ?? opts.profile.budgetMin,
+      budgetMax: profilePatch.budgetMax ?? opts.profile.budgetMax,
+      optInNotices: profilePatch.optInNotices ?? opts.profile.optInNotices,
       updatedAt: new Date(),
     })
-    .where(eq(clientProfiles.id, profile.id));
+    .where(eq(clientProfiles.id, opts.profile.id));
 
   if (reply) {
-    await sendTextMessage(cfg, conn.instanceName, phone, reply);
+    await sendTextMessage(opts.cfg, opts.instanceName, opts.phone, reply);
   }
 }

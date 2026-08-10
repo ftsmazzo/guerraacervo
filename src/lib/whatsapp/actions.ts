@@ -3,7 +3,7 @@
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { tenants, whatsappConnections } from "@/db/schema";
+import { tenants, whatsappConnections, clientProfiles, clients } from "@/db/schema";
 import { getAuthContext } from "@/lib/auth/context";
 import { assertTenantCanWrite } from "@/lib/auth/guards";
 import {
@@ -229,4 +229,45 @@ export async function disconnectWhatsapp(): Promise<WhatsappActionResult> {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, error: msg };
   }
+}
+
+export async function resumeClientBot(
+  clientId: string,
+): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const ctx = await getAuthContext();
+  if (!ctx?.tenant) return { ok: false, error: "Não autenticado." };
+  try {
+    assertTenantCanWrite(ctx, "clients");
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+
+  const [profile] = await db
+    .select({ id: clientProfiles.id })
+    .from(clientProfiles)
+    .innerJoin(clients, eq(clients.id, clientProfiles.clientId))
+    .where(
+      and(
+        eq(clientProfiles.clientId, clientId),
+        eq(clients.tenantId, ctx.tenant.id),
+      ),
+    )
+    .limit(1);
+
+  if (!profile) {
+    return { ok: false, error: "Cliente sem perfil WhatsApp." };
+  }
+
+  await db
+    .update(clientProfiles)
+    .set({
+      onboardingStep: "done",
+      onboardingStatus: "done",
+      updatedAt: new Date(),
+    })
+    .where(eq(clientProfiles.id, profile.id));
+
+  revalidatePath(`/painel/clientes/${clientId}`);
+  revalidatePath("/painel/loja");
+  return { ok: true, message: "Assistente reativado para este cliente." };
 }

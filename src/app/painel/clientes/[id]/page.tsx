@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { clientProfiles } from "@/db/schema";
 import { getAuthContext, hasEntitlement } from "@/lib/auth/context";
 import { getClient } from "@/lib/clients/queries";
 import { listOrdersByClient } from "@/lib/orders/queries";
+import { ResumeBotButton } from "./resume-bot-button";
 import "../clientes.css";
 
 function money(v: string | number) {
@@ -63,6 +67,23 @@ export default async function ClienteViewPage({
   const pedidos = canOrders
     ? await listOrdersByClient(ctx.tenant.id, id)
     : [];
+
+  const [waProfile] = await db
+    .select({
+      onboardingStatus: clientProfiles.onboardingStatus,
+      onboardingStep: clientProfiles.onboardingStep,
+      optInNotices: clientProfiles.optInNotices,
+    })
+    .from(clientProfiles)
+    .where(eq(clientProfiles.clientId, id))
+    .limit(1);
+
+  const inHandoff = waProfile?.onboardingStep === "human";
+  const agentReady =
+    waProfile &&
+    (waProfile.onboardingStatus === "done" ||
+      waProfile.onboardingStatus === "skipped") &&
+    !inHandoff;
 
   const cityUf =
     c.city || c.state
@@ -148,6 +169,20 @@ export default async function ClienteViewPage({
                   <tr>
                     <td>Obs.</td>
                     <td style={{ fontSize: "0.82rem" }}>{c.notes}</td>
+                  </tr>
+                ) : null}
+                {waProfile ? (
+                  <tr>
+                    <td>Agente WA</td>
+                    <td style={{ fontSize: "0.82rem" }}>
+                      {inHandoff
+                        ? "Em atendimento humano (bot pausado)"
+                        : agentReady
+                          ? "Agente ativo"
+                          : `Onboarding: ${waProfile.onboardingStatus}`}
+                      {waProfile.optInNotices ? " · opt-in avisos" : null}
+                      {inHandoff ? <ResumeBotButton clientId={c.id} /> : null}
+                    </td>
                   </tr>
                 ) : null}
               </tbody>

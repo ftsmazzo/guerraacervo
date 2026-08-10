@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { whatsappConnections } from "@/db/schema";
 import { resolveEvolutionConfig } from "@/lib/whatsapp/evolution";
-import { handleInboundMessage } from "@/lib/whatsapp/onboarding";
+import { handleInboundMessage } from "@/lib/whatsapp/agent/router";
 import { getConnectionByInstance } from "@/lib/whatsapp/queries";
 
 export const runtime = "nodejs";

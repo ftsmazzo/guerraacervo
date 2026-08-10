@@ -164,17 +164,25 @@ export function WhatsappPanel({
       ) : null}
 
       <div className="rounded-lg border border-line bg-card p-4 text-sm text-muted shadow-[var(--shadow)]">
-        <p className="font-medium text-ink">O que já funciona</p>
+        <p className="font-medium text-ink">Agente de vendas</p>
+        <p className="mt-1">
+          Status:{" "}
+          <span className="font-semibold text-ink">
+            {status === "open" ? "Agente ativo" : "Aguardando conexão"}
+          </span>
+        </p>
         <ul className="mt-2 list-disc space-y-1 pl-5">
-          <li>Conexão por QR (um número por sebo)</li>
+          <li>Onboarding de perfil (gêneros, temas, preço, opt-in)</li>
           <li>
-            Onboarding curto: quem mandar mensagem monta perfil (gêneros,
-            temas, preço, opt-in)
+            Indicações e busca no acervo (OpenRouter + tags do cliente)
           </li>
           <li>
-            Aviso de <strong>novo livro</strong> para clientes com opt-in
+            Reserva de pedido em <strong>Aguardando Pagamento</strong>
           </li>
-          <li>Tags de compra gravadas quando o pedido fica pago</li>
+          <li>
+            Handoff humano (*atendente* / *sair*) — no perfil do cliente use{" "}
+            <strong>Retomar bot</strong>
+          </li>
         </ul>
       </div>
     </div>
