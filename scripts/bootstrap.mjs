@@ -2,7 +2,7 @@
  * Start do container (deploy EasyPanel):
  * 1) espera Postgres
  * 2) aplica migrations Drizzle
- * 3) seed idempotente
+ * 3) seed idempotente (user + tenant + membership)
  */
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -47,44 +47,65 @@ async function waitForDb(sql) {
 async function seed(sql) {
   const email = "admin@guerraacervo.local";
   const password = "admin123";
+  const tenantSlug = "sebo-demo";
 
-  const existing = await sql`
+  let [admin] = await sql`
     select id from users where email = ${email} limit 1
   `;
-  if (existing.length) {
-    console.log("[bootstrap] Seed já aplicado:", email);
-    return;
+
+  if (!admin) {
+    const passwordHash = await bcrypt.hash(password, 10);
+    [admin] = await sql`
+      insert into users (email, name, password_hash, is_platform_admin)
+      values (${email}, ${"Admin Plataforma"}, ${passwordHash}, ${true})
+      returning id
+    `;
+    console.log("[bootstrap] user criado:", email);
+  } else {
+    console.log("[bootstrap] user já existe:", email);
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
-  const [admin] = await sql`
-    insert into users (email, name, password_hash, is_platform_admin)
-    values (${email}, ${"Admin Plataforma"}, ${passwordHash}, ${true})
-    returning id
+  let [tenant] = await sql`
+    select id, slug, plan_code from tenants where slug = ${tenantSlug} limit 1
   `;
 
-  const trialEnds = new Date();
-  trialEnds.setDate(trialEnds.getDate() + 7);
+  if (!tenant) {
+    const trialEnds = new Date();
+    trialEnds.setDate(trialEnds.getDate() + 7);
+    [tenant] = await sql`
+      insert into tenants (
+        name, slug, product, plan_code, status, trial_ends_at, store_enabled
+      ) values (
+        ${"Sebo Demo"},
+        ${tenantSlug},
+        ${"business"},
+        ${"business_trial"},
+        ${"trialing"},
+        ${trialEnds},
+        ${true}
+      )
+      returning id, slug, plan_code
+    `;
+    console.log("[bootstrap] tenant criado:", tenantSlug);
+  } else {
+    console.log("[bootstrap] tenant já existe:", tenantSlug);
+  }
 
-  const [tenant] = await sql`
-    insert into tenants (
-      name, slug, product, plan_code, status, trial_ends_at, store_enabled
-    ) values (
-      ${"Sebo Demo"},
-      ${"sebo-demo"},
-      ${"business"},
-      ${"business_trial"},
-      ${"trialing"},
-      ${trialEnds},
-      ${true}
-    )
-    returning id, slug, plan_code
+  const [membership] = await sql`
+    select id from memberships
+    where tenant_id = ${tenant.id} and user_id = ${admin.id}
+    limit 1
   `;
 
-  await sql`
-    insert into memberships (tenant_id, user_id, role)
-    values (${tenant.id}, ${admin.id}, ${"owner"})
-  `;
+  if (!membership) {
+    await sql`
+      insert into memberships (tenant_id, user_id, role)
+      values (${tenant.id}, ${admin.id}, ${"owner"})
+    `;
+    console.log("[bootstrap] membership owner vinculada");
+  } else {
+    console.log("[bootstrap] membership já existe");
+  }
 
   console.log("[bootstrap] Seed OK");
   console.log("  Admin:", email, "/", password);
