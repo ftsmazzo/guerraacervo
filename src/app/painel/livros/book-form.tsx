@@ -216,22 +216,22 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
 
   async function buscarIATexto() {
     if (!aiQuery.trim()) return;
-    setIsbnMsg("Consultando IA…");
+    setIsbnMsg("Consultando IA + web…");
     const res = await fetch("/api/isbn/ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: aiQuery }),
+      body: JSON.stringify({ query: aiQuery, webSearch: true }),
     });
     const d = await res.json();
     if (!res.ok) {
       setIsbnMsg(d.error || "Falha na IA");
       return;
     }
-    applyAiResult(d);
+    await applyAiResult(d);
   }
 
   async function buscarIAFoto(file: File) {
-    setIsbnMsg("Analisando foto da capa…");
+    setIsbnMsg("Analisando foto da capa (IA + web)…");
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));
@@ -241,21 +241,17 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     const res = await fetch("/api/isbn/ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageBase64: dataUrl }),
+      body: JSON.stringify({ imageBase64: dataUrl, webSearch: true }),
     });
     const d = await res.json();
     if (!res.ok) {
       setIsbnMsg(d.error || "Falha na IA");
       return;
     }
-    applyAiResult(d);
-    if (d.isbn) {
-      setIsbnBusca(d.isbn);
-      await buscarISBN(d.isbn);
-    }
+    await applyAiResult(d);
   }
 
-  function applyAiResult(d: Record<string, unknown>) {
+  async function applyAiResult(d: Record<string, unknown>) {
     if (d.titulo) setTitle(String(d.titulo));
     if (d.autor) setAuthor(String(d.autor));
     if (d.editora) setPublisher(String(d.editora));
@@ -265,8 +261,33 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     if (d.idioma) setLanguage(String(d.idioma));
     if (d.capa) setCoverUrl(String(d.capa));
     if (d.paginas) setPages(String(d.paginas));
+    if (d.tipoCapa === "Brochura" || d.tipoCapa === "Capa Dura") {
+      setCoverType(d.tipoCapa);
+    }
+    if (typeof d.peso === "number" && d.peso > 0 && !weight) {
+      setWeight(String(d.peso));
+    }
     if (Array.isArray(d.tags)) d.tags.forEach((t) => addTag(String(t)));
-    setIsbnMsg(`Preenchido por ${String(d._src || "IA")}`);
+
+    const isbnFound =
+      typeof d.isbn === "string" && d.isbn.replace(/\D/g, "").length >= 10
+        ? String(d.isbn)
+        : "";
+    const conf =
+      typeof d.confianca === "number"
+        ? ` · confiança ${Math.round(d.confianca * 100)}%`
+        : "";
+    const src = String(d._src || d.model || "IA");
+
+    if (isbnFound) {
+      setIsbn(isbnFound);
+      setIsbnBusca(isbnFound);
+      setIsbnMsg(`${src}${conf} — disparando motores ISBN…`);
+      await buscarISBN(isbnFound);
+      return;
+    }
+
+    setIsbnMsg(`Preenchido por ${src}${conf}`);
   }
 
   async function abrirScanner() {
@@ -449,7 +470,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
           <div className="mt-4 grid gap-3 border-t border-line pt-3 md:grid-cols-2">
             <div>
               <div className="mb-1 text-xs font-semibold text-muted">
-                IA · descrição / título solto
+                IA · descrição / título (OpenRouter + web)
               </div>
               <div className="flex gap-2">
                 <input
@@ -469,7 +490,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
             </div>
             <div>
               <div className="mb-1 text-xs font-semibold text-muted">
-                IA · foto da capa
+                IA · foto da capa (visão + web → ISBN)
               </div>
               <input
                 ref={fileRef}

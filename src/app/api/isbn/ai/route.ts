@@ -2,30 +2,43 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
   emptyLookup,
+  normISBN,
   type BookLookupResult,
 } from "@/lib/isbn/normalize";
+import {
+  openRouterChat,
+  OpenRouterError,
+  resolveOpenRouterConfig,
+  type AiBookPartial,
+} from "@/lib/isbn/openrouter";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 90;
 
 const bodySchema = z.union([
-  z.object({ query: z.string().min(3) }),
-  z.object({ imageBase64: z.string().min(20) }),
+  z.object({
+    query: z.string().min(3),
+    webSearch: z.boolean().optional(),
+  }),
+  z.object({
+    imageBase64: z.string().min(20),
+    webSearch: z.boolean().optional(),
+  }),
 ]);
 
-function parseAiJson(content: string): Partial<BookLookupResult> {
+function parseAiJson(content: string): AiBookPartial {
   const cleaned = content
     .replace(/^```json\s*/i, "")
     .replace(/^```\s*/i, "")
     .replace(/\s*```$/i, "")
     .trim();
   try {
-    return JSON.parse(cleaned) as Partial<BookLookupResult>;
+    return JSON.parse(cleaned) as AiBookPartial;
   } catch {
     const m = cleaned.match(/\{[\s\S]*\}/);
     if (m) {
       try {
-        return JSON.parse(m[0]) as Partial<BookLookupResult>;
+        return JSON.parse(m[0]) as AiBookPartial;
       } catch {
         return {};
       }
@@ -34,10 +47,21 @@ function parseAiJson(content: string): Partial<BookLookupResult> {
   }
 }
 
+function cleanIsbn(raw: unknown): string {
+  if (typeof raw !== "string" || !raw.trim()) return "";
+  const digits = raw.replace(/[^\dXx]/g, "");
+  if (digits.length < 10) return "";
+  try {
+    return normISBN(digits);
+  } catch {
+    return digits;
+  }
+}
+
 function toResult(
-  partial: Partial<BookLookupResult>,
+  partial: AiBookPartial,
   src: string,
-): BookLookupResult {
+): BookLookupResult & { isbn: string; confianca: number | null } {
   const base = emptyLookup(src);
   const tipo =
     partial.tipoCapa === "Brochura" || partial.tipoCapa === "Capa Dura"
@@ -65,30 +89,31 @@ function toResult(
     tags: Array.isArray(partial.tags)
       ? partial.tags.map(String).filter(Boolean).slice(0, 12)
       : [],
+    isbn: cleanIsbn(partial.isbn),
+    confianca:
+      typeof partial.confianca === "number" &&
+      Number.isFinite(partial.confianca)
+        ? Math.max(0, Math.min(1, partial.confianca))
+        : null,
   };
 }
 
-const FIELD_SPEC = `Responda APENAS com JSON válido (sem markdown) no formato:
-{
-  "titulo": string,
-  "autor": string,
-  "editora": string,
-  "ano": string (AAAA),
-  "sinopse": string,
-  "capa": string (URL se souber, senão ""),
-  "genero": string,
-  "idioma": string (ex: Português),
-  "paginas": number|null,
-  "tipoCapa": "Brochura"|"Capa Dura"|null,
-  "peso": number|null (gramas),
-  "tags": string[] (em português, curtas)
-}`;
+const SYSTEM_BASE = `Você é um catalogador de sebo brasileiro. Preencha a ficha do livro com o máximo de precisão.
+Regras:
+- Prefira ISBN-13 (978/979). Se só houver ISBN-10, converta mentalmente ou informe o que encontrar.
+- Tags curtas em português.
+- Não invente ISBN. Se não tiver certeza, deixe isbn vazio e baixe confianca.
+- tipoCapa só "Brochura" ou "Capa Dura" quando visível/conhecido.
+- Use dados da web quando disponíveis para confirmar título, autor, editora e ISBN.`;
 
 export async function POST(request: Request) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
+  const cfg = resolveOpenRouterConfig();
+  if (!cfg.apiKey) {
     return NextResponse.json(
-      { error: "OPENAI_API_KEY não configurada." },
+      {
+        error:
+          "OPENROUTER_API_KEY não configurada (ou OPENAI_API_KEY legado).",
+      },
       { status: 503 },
     );
   }
@@ -110,15 +135,20 @@ export async function POST(request: Request) {
 
   const dataIn = parsed.data;
   const isImage = "imageBase64" in dataIn;
+  const webSearch =
+    dataIn.webSearch !== undefined ? dataIn.webSearch : cfg.webSearch;
+
   const system = isImage
-    ? `Você identifica livros a partir da foto da capa. Extraia metadados bibliográficos. ${FIELD_SPEC}`
-    : `Você preenche metadados de livros a partir de uma descrição ou busca textual. ${FIELD_SPEC}`;
+    ? `${SYSTEM_BASE}
+Tarefa: identificar o livro pela foto da capa (OCR do título/autor/selo + busca web se habilitada).`
+    : `${SYSTEM_BASE}
+Tarefa: preencher ficha a partir da descrição/busca textual do usuário (+ web se habilitada).`;
 
   const userContent = isImage
     ? [
         {
           type: "text" as const,
-          text: "Identifique o livro nesta capa e preencha os campos.",
+          text: "Identifique o livro nesta capa e preencha todos os campos do schema. Extraia ISBN se aparecer na imagem ou na web.",
         },
         {
           type: "image_url" as const,
@@ -129,41 +159,25 @@ export async function POST(request: Request) {
           },
         },
       ]
-    : `Descrição / busca do livro:\n${dataIn.query}`;
+    : `Descrição / busca do livro:\n${dataIn.query}\n\nPreencha a ficha completa. Se possível, resolva o ISBN-13.`;
 
   try {
-    const r = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        temperature: 0.2,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userContent },
-        ],
-      }),
+    const { content, modelUsed } = await openRouterChat({
+      apiKey: cfg.apiKey,
+      appUrl: cfg.appUrl,
+      model: cfg.model,
+      fallbacks: cfg.fallbacks,
+      webSearch,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userContent },
+      ],
     });
 
-    if (!r.ok) {
-      const errText = await r.text().catch(() => "");
-      return NextResponse.json(
-        { error: "Falha na API OpenAI.", detail: errText.slice(0, 300) },
-        { status: 502 },
-      );
-    }
-
-    const data = (await r.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = data.choices?.[0]?.message?.content || "";
     const partial = parseAiJson(content);
     const result = toResult(
       partial,
-      isImage ? "IA (capa)" : "IA (texto)",
+      isImage ? `IA OpenRouter capa (${modelUsed})` : `IA OpenRouter (${modelUsed})`,
     );
 
     if (!result.titulo) {
@@ -173,11 +187,21 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      ...result,
+      model: modelUsed,
+      webSearch,
+    });
   } catch (e) {
+    if (e instanceof OpenRouterError) {
+      return NextResponse.json(
+        { error: "Falha na OpenRouter.", detail: e.detail },
+        { status: e.status >= 400 && e.status < 600 ? e.status : 502 },
+      );
+    }
     return NextResponse.json(
       {
-        error: "Erro ao consultar OpenAI.",
+        error: "Erro ao consultar OpenRouter.",
         detail: e instanceof Error ? e.message : String(e),
       },
       { status: 502 },

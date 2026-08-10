@@ -182,6 +182,9 @@ async function srcGoogleBooks(isbn13: string, isbn10: string | null) {
           break;
         }
       }
+      if (!capa) {
+        capa = `https://covers.openlibrary.org/b/isbn/${isbn13}-L.jpg`;
+      }
 
       const lang = String(inf.language || "");
       return nonempty({
@@ -205,6 +208,47 @@ async function srcGoogleBooks(isbn13: string, isbn10: string | null) {
     }
   }
   return null;
+}
+
+/** Open Library Search — cobre edições que a API bibkeys às vezes perde */
+async function srcOpenLibrarySearch(isbn13: string) {
+  try {
+    const raw = await httpGet(
+      `https://openlibrary.org/search.json?isbn=${isbn13}&limit=1&fields=title,author_name,publisher,first_publish_year,number_of_pages_median,subject,cover_i,language`,
+      10000,
+    );
+    const data = JSON.parse(raw) as {
+      docs?: Array<Record<string, unknown>>;
+    };
+    const doc = data.docs?.[0];
+    if (!doc) return null;
+    const coverId = doc.cover_i;
+    const langs = Array.isArray(doc.language)
+      ? (doc.language as string[])
+      : [];
+    const lang0 = langs[0] || "";
+    return nonempty({
+      titulo: String(doc.title || ""),
+      autor: Array.isArray(doc.author_name)
+        ? (doc.author_name as string[]).join(", ")
+        : "",
+      editora: Array.isArray(doc.publisher)
+        ? String((doc.publisher as string[])[0] || "")
+        : "",
+      ano: String(doc.first_publish_year || ""),
+      paginas: Number(doc.number_of_pages_median) || null,
+      genero: Array.isArray(doc.subject)
+        ? (doc.subject as string[]).slice(0, 3).join(", ")
+        : "",
+      idioma: LANG_MAP[lang0] || "",
+      capa: coverId
+        ? `https://covers.openlibrary.org/b/id/${coverId}-L.jpg`
+        : `https://covers.openlibrary.org/b/isbn/${isbn13}-L.jpg`,
+      _src: "Open Library Search",
+    });
+  } catch {
+    return null;
+  }
 }
 
 async function srcOpenLibrary(isbn13: string) {
@@ -452,6 +496,7 @@ export async function GET(request: Request) {
   const results = await Promise.allSettled([
     srcGoogleBooks(isbn13, isbn10),
     srcOpenLibrary(isbn13),
+    srcOpenLibrarySearch(isbn13),
     srcSkoob(isbn13),
     srcEstanteVirtual(isbn13),
     srcAmazon(isbn13),
