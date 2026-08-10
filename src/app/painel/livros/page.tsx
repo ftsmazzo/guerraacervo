@@ -5,6 +5,8 @@ import { listBooks, listTagCloud } from "@/lib/books/queries";
 import { DeleteBookButton } from "./delete-book-button";
 import "./livros.css";
 
+export const dynamic = "force-dynamic";
+
 const TAG_COLORS = [
   "#e67e22",
   "#16a34a",
@@ -393,7 +395,7 @@ export default async function LivrosPage({
                           <>
                             <br />
                             <small className="text-amber-700">
-                              🔖 {l.reserved}
+                              reserv. {l.reserved}
                             </small>
                           </>
                         ) : null}
@@ -401,7 +403,7 @@ export default async function LivrosPage({
                       <td className="text-center">
                         {l.available > 0 ? (
                           <span className="badge-disponivel">
-                            ✓ {l.available}
+                            Disp. {l.available}
                           </span>
                         ) : l.stock > 0 && l.reserved > 0 ? (
                           <span className="badge-reservado">Reservado</span>

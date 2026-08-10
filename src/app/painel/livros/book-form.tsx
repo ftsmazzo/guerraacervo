@@ -134,6 +134,8 @@ export type BookFormInitial = {
   purchasePrice?: string | null;
   salePrice?: string;
   stock?: number;
+  reserved?: number;
+  available?: number;
   location?: string | null;
   tagsList?: string[];
   createdAt?: string;
@@ -1153,6 +1155,22 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
                     value={stock}
                     onChange={(e) => setStock(e.target.value)}
                   />
+                  {typeof initial?.reserved === "number" &&
+                  initial.reserved > 0 ? (
+                    <div className="form-text" style={{ color: "#b45309" }}>
+                      Reservado em pedidos (Aguardando Pagamento):{" "}
+                      <strong>{initial.reserved}</strong>
+                      {typeof initial.available === "number"
+                        ? ` · disponível agora: ${initial.available}`
+                        : null}
+                    </div>
+                  ) : (
+                    <div className="form-text">
+                      Estoque físico. Reservas de pedidos em Aguardando
+                      Pagamento baixam a disponibilidade sem alterar este
+                      número.
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="form-label">

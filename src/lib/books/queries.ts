@@ -280,8 +280,13 @@ export async function getBook(tenantId: string, id: string) {
     .where(eq(bookTags.bookId, id))
     .orderBy(asc(tags.name));
 
+  const reservedMap = await reservedByBookIds([id]);
+  const reserved = reservedMap.get(id) ?? 0;
+
   return {
     ...row,
+    reserved,
+    available: row.stock - reserved,
     tagsList: bookTagRows.map((t) => t.name),
   };
 }

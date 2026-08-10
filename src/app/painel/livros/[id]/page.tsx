@@ -38,6 +38,8 @@ export default async function EditarLivroPage({
         purchasePrice: book.purchasePrice,
         salePrice: book.salePrice,
         stock: book.stock,
+        reserved: book.reserved,
+        available: book.available,
         location: book.location,
         tagsList: book.tagsList,
         createdAt: book.createdAt.toISOString(),

@@ -1,4 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { books, clients, orderItems, orders } from "@/db/schema";
 
@@ -89,6 +90,11 @@ export async function createOrderInternal(opts: {
 
       return ord.id;
     });
+    revalidatePath("/painel/livros");
+    revalidatePath("/painel/pedidos");
+    revalidatePath(`/painel/pedidos/${orderId}`);
+    revalidatePath(`/painel/clientes/${opts.clientId}`);
+    revalidatePath("/painel");
     return { ok: true, id: orderId };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
