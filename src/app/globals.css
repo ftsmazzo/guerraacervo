@@ -1,33 +1,55 @@
 @import "tailwindcss";
 
+/* ╔══════════════════════════════════════════════════════╗
+   ║  GuerraAcervo · Design System · Paleta Quente Clara ║
+   ║  Identidade visual — Renato (legado)                 ║
+   ╚══════════════════════════════════════════════════════╝ */
 :root {
-  --background: #f7f6f3;
-  --foreground: #1a1c1e;
-  --muted: #5c6370;
+  --background: #f9f7f4;
+  --foreground: #1c1917;
+  --muted: #78716c;
+  --muted-2: #44403c;
   --card: #ffffff;
-  --line: #e4e1da;
-  --accent: #1f6b4a;
-  --accent-soft: #e8f3ed;
-  --ink: #12141a;
+  --line: #ece5d8;
+  --line-strong: #ddd6ca;
+  --accent: #e67e22;
+  --accent-dark: #c2410c;
+  --accent-soft: #fff3e6;
+  --accent-text: #9a3412;
+  --ink: #1c1917;
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #57534e;
+  --sidebar-hover: #fdf8f3;
+  --radius: 8px;
+  --shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
   --color-card: var(--card);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-accent: var(--accent);
+  --color-accent-dark: var(--accent-dark);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
   --color-ink: var(--ink);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-sidebar-text: var(--sidebar-text);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --font-sans: var(--font-brand);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-brand), system-ui, sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
 }
 
 a {

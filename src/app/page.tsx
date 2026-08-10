@@ -33,7 +33,7 @@ export default function HomePage() {
             </Link>
             <Link
               href="/painel"
-              className="rounded-md bg-accent px-3 py-1.5 font-medium text-white"
+              className="rounded-md bg-accent px-3 py-1.5 font-medium text-white hover:bg-accent-dark"
             >
               Painel
             </Link>
@@ -42,22 +42,18 @@ export default function HomePage() {
       </header>
 
       <section className="mx-auto max-w-5xl px-6 py-16">
-        <p className="mb-3 text-sm font-medium text-accent">Base local</p>
+        <p className="mb-3 text-sm font-medium text-accent-text">GuerraAcervo</p>
         <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-ink">
-          Estrutura SaaS multi-tenant pronta para evoluir.
+          Gestão para sebos e coleções, online.
         </h1>
         <p className="mt-4 max-w-xl text-base leading-relaxed text-muted">
-          Control plane, planos Negócio e Pessoal, Postgres e Redis. O app
-          Electron legado permanece na raiz; este código vive em{" "}
-          <code className="rounded bg-accent-soft px-1.5 py-0.5 text-sm text-accent">
-            /saas
-          </code>
-          .
+          Planos Negócio e Pessoal, multi-tenant, Postgres e Redis. Base pronta
+          para auth, cobrança e o operacional do sebo.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
             href="/painel"
-            className="rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-white"
+            className="rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-dark"
           >
             Abrir painel
           </Link>

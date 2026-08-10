@@ -33,7 +33,7 @@ export default function LoginPage() {
           </label>
           <Link
             href="/painel"
-            className="flex w-full items-center justify-center rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-white"
+            className="flex w-full items-center justify-center rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-dark"
           >
             Continuar para o painel (stub)
           </Link>

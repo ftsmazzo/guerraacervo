@@ -32,9 +32,6 @@ yarn-error.log*
 .env
 .env*.local
 
-# drizzle
-/drizzle/meta
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts

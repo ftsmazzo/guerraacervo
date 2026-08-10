@@ -53,12 +53,16 @@ Health: http://localhost:3000/api/health
 
 Serviços: `app` (Dockerfile) + `postgres` + `redis`.
 
+No start do container o entrypoint roda `scripts/bootstrap.mjs` (migrate + seed).
+Não executar migration/seed via shell em produção.
+
 Variáveis principais no app:
 
 - `DATABASE_URL`
 - `REDIS_URL`
 - `AUTH_SECRET`
 - `NEXT_PUBLIC_APP_URL`
+- `RUN_SEED` (default: true; use `false` para pular seed)
 
 ## Roadmap
 
