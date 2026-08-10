@@ -50,11 +50,13 @@ function emptyToNull(v: string | null | undefined): string | null {
 }
 
 function toDbValues(data: ClientInput, tenantId: string) {
+  const waRaw = emptyToNull(data.whatsapp);
+  const waDigits = waRaw ? waRaw.replace(/\D/g, "") : null;
   return {
     tenantId,
     name: data.nome,
     cpf: emptyToNull(data.cpf),
-    whatsapp: emptyToNull(data.whatsapp),
+    whatsapp: waDigits,
     email: emptyToNull(data.email),
     cep: emptyToNull(data.cep),
     street: emptyToNull(data.logradouro),
@@ -90,6 +92,8 @@ export async function createClient(
       .values(toDbValues(parsed.data, ctx.tenant.id))
       .returning({ id: clients.id });
     revalidatePath("/painel/clientes");
+    revalidatePath("/painel/pedidos");
+    revalidatePath("/painel/pedidos/novo");
     revalidatePath("/painel");
     return { ok: true, id: row.id };
   } catch (e) {

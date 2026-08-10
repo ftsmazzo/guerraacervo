@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useState, useTransition } from "react";
+import { createClient } from "@/lib/clients/actions";
 import {
   createOrder,
   searchOrderBooksAction,
@@ -39,7 +40,7 @@ function todayISO() {
 }
 
 export function OrderForm({
-  clients,
+  clients: initialClients,
   preselectedClientId,
 }: {
   clients: ClientOption[];
@@ -49,6 +50,7 @@ export function OrderForm({
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  const [clients, setClients] = useState<ClientOption[]>(initialClients);
   const [clienteId, setClienteId] = useState(preselectedClientId || "");
   const [dataPedido, setDataPedido] = useState(todayISO());
   const [formaPagamento, setFormaPagamento] = useState("");
@@ -58,6 +60,14 @@ export function OrderForm({
   const [busca, setBusca] = useState("");
   const [results, setResults] = useState<BookPickerItem[]>([]);
   const [searching, setSearching] = useState(false);
+
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [ncNome, setNcNome] = useState("");
+  const [ncWhatsapp, setNcWhatsapp] = useState("");
+  const [ncCidade, setNcCidade] = useState("");
+  const [ncEstado, setNcEstado] = useState("");
+  const [ncError, setNcError] = useState<string | null>(null);
+  const [ncPending, setNcPending] = useState(false);
 
   const totals = useMemo(() => {
     let peso = 0;
@@ -122,19 +132,63 @@ export function OrderForm({
     setCart((prev) => prev.filter((x) => x.bookId !== bookId));
   }
 
+  async function saveQuickClient() {
+    setNcError(null);
+    if (!ncNome.trim()) {
+      setNcError("Nome é obrigatório.");
+      return;
+    }
+    if (!ncWhatsapp.trim()) {
+      setNcError("WhatsApp é obrigatório para o fluxo do sebo.");
+      return;
+    }
+    setNcPending(true);
+    try {
+      const result = await createClient({
+        nome: ncNome.trim(),
+        whatsapp: ncWhatsapp.trim(),
+        cidade: ncCidade.trim() || null,
+        estado: ncEstado.trim() || null,
+      });
+      if (!result.ok) {
+        setNcError(result.error);
+        return;
+      }
+      const option: ClientOption = {
+        id: result.id,
+        name: ncNome.trim(),
+        city: ncCidade.trim() || null,
+        state: ncEstado.trim() || null,
+      };
+      setClients((prev) =>
+        [...prev.filter((c) => c.id !== option.id), option].sort((a, b) =>
+          a.name.localeCompare(b.name, "pt-BR"),
+        ),
+      );
+      setClienteId(result.id);
+      setShowNewClient(false);
+      setNcNome("");
+      setNcWhatsapp("");
+      setNcCidade("");
+      setNcEstado("");
+    } finally {
+      setNcPending(false);
+    }
+  }
+
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!cart.length) {
+      setError("Adicione pelo menos um livro ao pedido.");
+      return;
+    }
     if (!clienteId) {
-      setError("Selecione o cliente.");
+      setError("Selecione ou cadastre o cliente.");
       return;
     }
     if (!formaPagamento) {
       setError("Selecione a forma de pagamento.");
-      return;
-    }
-    if (!cart.length) {
-      setError("Adicione pelo menos um livro ao pedido.");
       return;
     }
 
@@ -194,7 +248,9 @@ export function OrderForm({
             disabled={pending}
             onClick={() =>
               (
-                document.getElementById("btn-submit-pedido") as HTMLButtonElement | null
+                document.getElementById(
+                  "btn-submit-pedido",
+                ) as HTMLButtonElement | null
               )?.click()
             }
           >
@@ -206,82 +262,6 @@ export function OrderForm({
       {error ? <div className="error-box">{error}</div> : null}
 
       <form onSubmit={onSubmit}>
-        <div className="card" style={{ marginBottom: "1rem" }}>
-          <div className="card-header">
-            <span className="card-title-icon">●</span> Dados do Pedido
-          </div>
-          <div className="card-body">
-            <div className="row-g row-pedido">
-              <div>
-                <label className="form-label">
-                  Cliente <span className="required-star">*</span>
-                </label>
-                <select
-                  className="form-select"
-                  required
-                  value={clienteId}
-                  onChange={(e) => setClienteId(e.target.value)}
-                >
-                  <option value="">— Selecione o cliente —</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                      {c.city
-                        ? ` — ${c.city}${c.state ? `/${c.state}` : ""}`
-                        : ""}
-                    </option>
-                  ))}
-                </select>
-                <div className="form-text">
-                  <Link href="/painel/clientes/novo" target="_blank">
-                    Cadastrar novo cliente
-                  </Link>
-                </div>
-              </div>
-              <div>
-                <label className="form-label">
-                  Data do Pedido <span className="required-star">*</span>
-                </label>
-                <input
-                  type="date"
-                  className="form-control"
-                  required
-                  value={dataPedido}
-                  onChange={(e) => setDataPedido(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="form-label">
-                  Forma de Pagamento <span className="required-star">*</span>
-                </label>
-                <select
-                  className="form-select"
-                  required
-                  value={formaPagamento}
-                  onChange={(e) => setFormaPagamento(e.target.value)}
-                >
-                  <option value="">Selecione…</option>
-                  {PAYMENT_METHODS.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div style={{ marginTop: "0.85rem" }}>
-              <label className="form-label">Observações</label>
-              <textarea
-                className="form-control"
-                rows={2}
-                value={observacoes}
-                onChange={(e) => setObservacoes(e.target.value)}
-                placeholder="Instruções de entrega, embalagem, etc."
-              />
-            </div>
-          </div>
-        </div>
-
         <div className="card" style={{ marginBottom: "1rem" }}>
           <div className="card-header">
             <span className="card-title-icon">●</span> Adicionar Livros
@@ -341,7 +321,7 @@ export function OrderForm({
           </div>
         </div>
 
-        <div className="card">
+        <div className="card" style={{ marginBottom: "1rem" }}>
           <div className="card-header">
             <span className="card-title-icon">●</span> Itens do Pedido
           </div>
@@ -363,7 +343,7 @@ export function OrderForm({
                   {cart.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="empty">
-                        Nenhum livro adicionado
+                        Nenhum livro adicionado — busque acima
                       </td>
                     </tr>
                   ) : (
@@ -428,6 +408,100 @@ export function OrderForm({
           </div>
         </div>
 
+        <div className="card" style={{ marginBottom: "1rem" }}>
+          <div className="card-header">
+            <span className="card-title-icon">●</span> Cliente e pagamento
+          </div>
+          <div className="card-body">
+            <div className="row-g row-pedido">
+              <div>
+                <label className="form-label">
+                  Cliente <span className="required-star">*</span>
+                </label>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "0.5rem",
+                    alignItems: "flex-start",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <select
+                    className="form-select"
+                    required
+                    value={clienteId}
+                    onChange={(e) => setClienteId(e.target.value)}
+                    style={{ flex: "1 1 220px" }}
+                  >
+                    <option value="">— Selecione o cliente —</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                        {c.city
+                          ? ` — ${c.city}${c.state ? `/${c.state}` : ""}`
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="btn-outline"
+                    onClick={() => {
+                      setNcError(null);
+                      setShowNewClient(true);
+                    }}
+                  >
+                    + Novo cliente
+                  </button>
+                </div>
+                <div className="form-text">
+                  Cadastro rápido no caixa — o pedido não se perde.
+                </div>
+              </div>
+              <div>
+                <label className="form-label">
+                  Data do Pedido <span className="required-star">*</span>
+                </label>
+                <input
+                  type="date"
+                  className="form-control"
+                  required
+                  value={dataPedido}
+                  onChange={(e) => setDataPedido(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="form-label">
+                  Forma de Pagamento <span className="required-star">*</span>
+                </label>
+                <select
+                  className="form-select"
+                  required
+                  value={formaPagamento}
+                  onChange={(e) => setFormaPagamento(e.target.value)}
+                >
+                  <option value="">Selecione…</option>
+                  {PAYMENT_METHODS.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div style={{ marginTop: "0.85rem" }}>
+              <label className="form-label">Observações</label>
+              <textarea
+                className="form-control"
+                rows={2}
+                value={observacoes}
+                onChange={(e) => setObservacoes(e.target.value)}
+                placeholder="Instruções de entrega, embalagem, etc."
+              />
+            </div>
+          </div>
+        </div>
+
         <div className="form-actions">
           <button
             id="btn-submit-pedido"
@@ -442,6 +516,101 @@ export function OrderForm({
           </Link>
         </div>
       </form>
+
+      {showNewClient ? (
+        <div
+          className="order-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => !ncPending && setShowNewClient(false)}
+        >
+          <div
+            className="order-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h5 style={{ margin: "0 0 0.35rem" }}>Novo cliente (caixa)</h5>
+            <p
+              style={{
+                margin: "0 0 1rem",
+                fontSize: "0.85rem",
+                color: "var(--muted)",
+              }}
+            >
+              Nome + WhatsApp bastam. Depois do <strong>Pago</strong>, o bot
+              convida ao perfil.
+            </p>
+            {ncError ? <div className="error-box">{ncError}</div> : null}
+            <label className="form-label">
+              Nome <span className="required-star">*</span>
+            </label>
+            <input
+              className="form-control"
+              value={ncNome}
+              onChange={(e) => setNcNome(e.target.value)}
+              autoFocus
+            />
+            <label className="form-label" style={{ marginTop: "0.75rem" }}>
+              WhatsApp <span className="required-star">*</span>
+            </label>
+            <input
+              className="form-control"
+              value={ncWhatsapp}
+              onChange={(e) => setNcWhatsapp(e.target.value)}
+              placeholder="16996480805"
+            />
+            <div
+              className="row-g"
+              style={{
+                marginTop: "0.75rem",
+                gridTemplateColumns: "1fr 80px",
+              }}
+            >
+              <div>
+                <label className="form-label">Cidade</label>
+                <input
+                  className="form-control"
+                  value={ncCidade}
+                  onChange={(e) => setNcCidade(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="form-label">UF</label>
+                <input
+                  className="form-control"
+                  maxLength={2}
+                  value={ncEstado}
+                  onChange={(e) => setNcEstado(e.target.value.toUpperCase())}
+                />
+              </div>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: "0.5rem",
+                marginTop: "1.1rem",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                type="button"
+                className="btn-outline"
+                disabled={ncPending}
+                onClick={() => setShowNewClient(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn-accent"
+                disabled={ncPending}
+                onClick={() => void saveQuickClient()}
+              >
+                {ncPending ? "Salvando…" : "Salvar e usar no pedido"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
