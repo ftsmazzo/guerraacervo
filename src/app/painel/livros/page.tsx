@@ -104,17 +104,24 @@ export default async function LivrosPage({
   if (order !== "createdAt") base.order = order;
   if (dir !== "desc") base.dir = dir;
 
-  const [livros, cloud] = await Promise.all([
-    listBooks(ctx.tenant.id, {
-      busca,
-      estado,
-      disponivel,
-      tags: activeTags,
-      order,
-      dir,
-    }),
-    listTagCloud(ctx.tenant.id),
-  ]);
+  let livros: Awaited<ReturnType<typeof listBooks>> = [];
+  let cloud: Awaited<ReturnType<typeof listTagCloud>> = [];
+  let loadError: string | null = null;
+  try {
+    [livros, cloud] = await Promise.all([
+      listBooks(ctx.tenant.id, {
+        busca,
+        estado,
+        disponivel,
+        tags: activeTags,
+        order,
+        dir,
+      }),
+      listTagCloud(ctx.tenant.id),
+    ]);
+  } catch (e) {
+    loadError = e instanceof Error ? e.message : String(e);
+  }
 
   function toggleTag(name: string) {
     const next = activeTags.includes(name)
@@ -127,6 +134,20 @@ export default async function LivrosPage({
 
   return (
     <div className="livros-page">
+      {loadError ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: "0.75rem",
+            borderColor: "#dc2626",
+            color: "#991b1b",
+          }}
+        >
+          <div className="card-body">
+            Falha ao carregar livros: {loadError}
+          </div>
+        </div>
+      ) : null}
       <div className="page-header">
         <div>
           <h4>

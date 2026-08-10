@@ -1,10 +1,10 @@
 import {
   and,
   asc,
-  count,
   desc,
   eq,
   ilike,
+  inArray,
   or,
   sql,
   type SQL,
@@ -34,14 +34,6 @@ export type ListBooksFilters = {
   dir?: "asc" | "desc";
 };
 
-const reservedExpr = sql<number>`(
-  SELECT COALESCE(SUM(${orderItems.quantity}), 0)::int
-  FROM ${orderItems}
-  INNER JOIN ${orders} ON ${orders.id} = ${orderItems.orderId}
-  WHERE ${orderItems.bookId} = ${books.id}
-    AND ${orders.status} = 'Aguardando Pagamento'
-)`.mapWith(Number);
-
 export type BookListItem = {
   id: string;
   isbn: string | null;
@@ -63,9 +55,7 @@ export type BookListItem = {
   tagsList: string[];
 };
 
-function resolveOrderColumn(
-  orderKey: ListBooksFilters["order"],
-) {
+function resolveOrderColumn(orderKey: ListBooksFilters["order"]) {
   switch (orderKey) {
     case "titulo":
     case "title":
@@ -84,6 +74,57 @@ function resolveOrderColumn(
     default:
       return books.createdAt;
   }
+}
+
+async function reservedByBookIds(
+  bookIds: string[],
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (!bookIds.length) return map;
+
+  const rows = await db
+    .select({
+      bookId: orderItems.bookId,
+      qty: sql<number>`COALESCE(SUM(${orderItems.quantity}), 0)::int`,
+    })
+    .from(orderItems)
+    .innerJoin(orders, eq(orders.id, orderItems.orderId))
+    .where(
+      and(
+        inArray(orderItems.bookId, bookIds),
+        eq(orders.status, "Aguardando Pagamento"),
+      ),
+    )
+    .groupBy(orderItems.bookId);
+
+  for (const r of rows) {
+    map.set(r.bookId, Number(r.qty ?? 0));
+  }
+  return map;
+}
+
+async function tagsByBookIds(
+  bookIds: string[],
+): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  if (!bookIds.length) return map;
+
+  const rows = await db
+    .select({
+      bookId: bookTags.bookId,
+      name: tags.name,
+    })
+    .from(bookTags)
+    .innerJoin(tags, eq(tags.id, bookTags.tagId))
+    .where(inArray(bookTags.bookId, bookIds))
+    .orderBy(asc(tags.name));
+
+  for (const r of rows) {
+    const list = map.get(r.bookId) || [];
+    list.push(r.name);
+    map.set(r.bookId, list);
+  }
+  return map;
 }
 
 export async function listBooks(
@@ -155,20 +196,19 @@ export async function listBooks(
       stock: books.stock,
       location: books.location,
       createdAt: books.createdAt,
-      reserved: reservedExpr,
-      tagsAgg: sql<string | null>`(
-        SELECT string_agg(${tags.name}, ',' ORDER BY ${tags.name})
-        FROM ${bookTags}
-        INNER JOIN ${tags} ON ${tags.id} = ${bookTags.tagId}
-        WHERE ${bookTags.bookId} = ${books.id}
-      )`,
     })
     .from(books)
     .where(and(...conditions))
     .orderBy(dirFn(orderCol));
 
+  const ids = rows.map((r) => r.id);
+  const [reservedMap, tagsMap] = await Promise.all([
+    reservedByBookIds(ids),
+    tagsByBookIds(ids),
+  ]);
+
   let items: BookListItem[] = rows.map((r) => {
-    const reserved = Number(r.reserved ?? 0);
+    const reserved = reservedMap.get(r.id) ?? 0;
     return {
       id: r.id,
       isbn: r.isbn,
@@ -187,7 +227,7 @@ export async function listBooks(
       createdAt: r.createdAt,
       reserved,
       available: r.stock - reserved,
-      tagsList: r.tagsAgg ? r.tagsAgg.split(",").filter(Boolean) : [],
+      tagsList: tagsMap.get(r.id) ?? [],
     };
   });
 
@@ -226,10 +266,9 @@ export async function getBook(tenantId: string, id: string) {
       location: books.location,
       createdAt: books.createdAt,
       updatedAt: books.updatedAt,
-      reserved: reservedExpr,
     })
     .from(books)
-    .where(and(eq(books.id, id), eq(books.tenantId, tenantId)))
+    .where(and(eq(books.tenantId, tenantId), eq(books.id, id)))
     .limit(1);
 
   if (!row) return null;
@@ -241,12 +280,8 @@ export async function getBook(tenantId: string, id: string) {
     .where(eq(bookTags.bookId, id))
     .orderBy(asc(tags.name));
 
-  const reserved = Number(row.reserved ?? 0);
   return {
     ...row,
-    reserved,
-    available: row.stock - reserved,
-    tags: bookTagRows.map((t) => t.name),
     tagsList: bookTagRows.map((t) => t.name),
   };
 }
@@ -257,16 +292,17 @@ export async function listTagCloud(
   tenantId: string,
   limit = 100,
 ): Promise<TagCloudItem[]> {
+  const qtdExpr = sql<number>`count(${bookTags.bookId})::int`;
   const rows = await db
     .select({
       name: tags.name,
-      qtd: count(bookTags.bookId),
+      qtd: qtdExpr,
     })
     .from(tags)
     .innerJoin(bookTags, eq(bookTags.tagId, tags.id))
     .where(eq(tags.tenantId, tenantId))
     .groupBy(tags.id, tags.name)
-    .orderBy(desc(count(bookTags.bookId)), asc(tags.name))
+    .orderBy(desc(qtdExpr), asc(tags.name))
     .limit(limit);
 
   return rows.map((r) => ({ name: r.name, qtd: Number(r.qtd) }));
