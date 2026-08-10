@@ -7,6 +7,11 @@ import {
   toISBN10,
 } from "@/lib/isbn/normalize";
 
+function googleBooksKeyQ(): string {
+  const key = process.env.GOOGLE_BOOKS_API_KEY?.trim();
+  return key ? `&key=${encodeURIComponent(key)}` : "";
+}
+
 export type EditionHit = {
   isbn13: string;
   titulo: string;
@@ -102,7 +107,7 @@ export async function verifyIsbnExists(isbnRaw: string): Promise<{
   const isbn10 = toISBN10(isbn13);
 
   try {
-    const gbUrl = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn13}&maxResults=1`;
+    const gbUrl = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn13}&maxResults=1${googleBooksKeyQ()}`;
     const gbRes = await fetch(gbUrl, { cache: "no-store" });
     if (gbRes.ok) {
       const gb = (await gbRes.json()) as {
@@ -163,7 +168,7 @@ export async function verifyIsbnExists(isbnRaw: string): Promise<{
   if (isbn10) {
     try {
       const gbRes = await fetch(
-        `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn10}&maxResults=1`,
+        `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn10}&maxResults=1${googleBooksKeyQ()}`,
         { cache: "no-store" },
       );
       if (gbRes.ok) {
@@ -189,7 +194,7 @@ async function searchGoogleBooksCandidates(
   for (const q of queries) {
     if (!q.trim()) continue;
     try {
-      const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=8&printType=books`;
+      const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=8&printType=books${googleBooksKeyQ()}`;
       const r = await fetch(url, { cache: "no-store" });
       if (!r.ok) continue;
       const data = (await r.json()) as {
@@ -395,7 +400,7 @@ export async function findCoverByTitleAuthor(
   if (q.length < 3) return "";
 
   try {
-    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=5&langRestrict=pt`;
+    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=5&langRestrict=pt${googleBooksKeyQ()}`;
     const r = await fetch(url, { cache: "no-store" });
     if (!r.ok) return "";
     const data = (await r.json()) as {

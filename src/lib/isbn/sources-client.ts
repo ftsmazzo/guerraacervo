@@ -1,9 +1,7 @@
 import {
   detectCapa,
   emptyLookup,
-  LANG_MAP,
   parsePeso,
-  toISBN10,
   type BookLookupResult,
 } from "@/lib/isbn/normalize";
 import { processarTags } from "@/lib/isbn/tags-pt";
@@ -13,53 +11,18 @@ export type { BookLookupResult };
 export async function fetchGoogle(
   isbn: string,
 ): Promise<BookLookupResult | null> {
-  const isbn10 = toISBN10(isbn);
-  const queries = [`isbn:${isbn}`, isbn10 ? `isbn:${isbn10}` : null, isbn].filter(
-    Boolean,
-  ) as string[];
-  for (const q of queries) {
-    try {
-      const r = await fetch(
-        `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=1`,
-      );
-      const d = await r.json();
-      if (!d.items?.length) continue;
-      const inf = d.items[0].volumeInfo;
-      let capa = "";
-      if (inf.imageLinks) {
-        const raw =
-          inf.imageLinks.extraLarge ||
-          inf.imageLinks.large ||
-          inf.imageLinks.medium ||
-          inf.imageLinks.thumbnail ||
-          "";
-        capa = raw
-          .replace("http://", "https://")
-          .replace("&edge=curl", "")
-          .replace("zoom=1", "zoom=3");
-      }
-      const titulo = inf.subtitle
-        ? `${inf.title}: ${inf.subtitle}`
-        : inf.title || "";
-      return {
-        ...emptyLookup("Google Books"),
-        titulo,
-        paginas: inf.pageCount || null,
-        autor: (inf.authors || []).join(", "),
-        editora: inf.publisher || "",
-        ano: (inf.publishedDate || "").match(/\d{4}/)?.[0] || "",
-        sinopse: inf.description || "",
-        capa,
-        genero: (inf.categories || []).join(", "),
-        idioma: LANG_MAP[inf.language] || inf.language || "",
-        tags: processarTags(inf.categories || []),
-        _src: "Google Books",
-      };
-    } catch {
-      /* next */
-    }
+  try {
+    const r = await fetch(
+      `/api/isbn/google?isbn=${encodeURIComponent(isbn)}`,
+      { credentials: "include" },
+    );
+    if (!r.ok) return null;
+    const d = await r.json();
+    if (!d || !d.titulo) return null;
+    return d as BookLookupResult;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 export async function fetchOpenLibrary(
