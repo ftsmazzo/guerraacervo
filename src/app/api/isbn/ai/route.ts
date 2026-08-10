@@ -348,14 +348,18 @@ Consultas:
     }
   }
 
-  // —— Etapa E: capa ——
+  // —— Etapa E: capa (sempre tenta HTTP boa; nunca placeholder OL) ——
   if (
     !result.capa ||
+    !isPlausibleCoverUrl(result.capa) ||
     result.capa.includes("covers.openlibrary.org/b/isbn/")
   ) {
-    result.capa = result.capa.includes("covers.openlibrary.org/b/isbn/")
-      ? ""
-      : result.capa;
+    result.capa =
+      result.capa &&
+      isPlausibleCoverUrl(result.capa) &&
+      !result.capa.includes("covers.openlibrary.org/b/isbn/")
+        ? result.capa
+        : "";
     const found = await findCoverByTitleAuthor(
       result.titulo,
       result.autor,
@@ -367,6 +371,31 @@ Consultas:
         result.capa = found;
         result.capaOrigem = "titulo";
       }
+    }
+  }
+
+  // Reforço: ISBN confirmado ainda sem capa → verifyIsbnExists
+  if (
+    result.isbnConfirmado &&
+    result.isbn &&
+    (!result.capa || result.capa.includes("covers.openlibrary.org/b/isbn/"))
+  ) {
+    try {
+      const verified = await verifyIsbnExists(result.isbn);
+      if (
+        verified.ok &&
+        verified.capa &&
+        isPlausibleCoverUrl(verified.capa) &&
+        !verified.capa.includes("covers.openlibrary.org/b/isbn/")
+      ) {
+        const { probeCoverUrl } = await import("@/lib/isbn/normalize");
+        if (await probeCoverUrl(verified.capa)) {
+          result.capa = verified.capa;
+          result.capaOrigem = "catalogo";
+        }
+      }
+    } catch {
+      /* ignore */
     }
   }
 
@@ -477,16 +506,19 @@ Tarefa: preencher ficha a partir da descrição (+ web).`;
 
     await enrichIsbnAndWeight(result, cfg, webSearch);
 
-    // Fluxo com foto: capa upload tem prioridade — não devolver placeholder
+    // Fluxo com foto: preferir capa HTTP do catálogo; foto fica só como fallback no client
     if (isImage) {
       if (
-        !result.capa ||
-        result.capa.includes("covers.openlibrary.org/b/isbn/")
+        result.capa &&
+        isPlausibleCoverUrl(result.capa) &&
+        !result.capa.includes("covers.openlibrary.org/b/isbn/")
       ) {
+        result.avisos.push("Capa da web encontrada — preferir em vez da foto.");
+      } else {
         result.capa = "";
         result.capaOrigem = "nenhuma";
         result.avisos.push(
-          "Mantendo a foto enviada como capa (catálogo sem imagem confiável).",
+          "Sem capa confiável na web — o formulário usará a foto recortada.",
         );
       }
     }
@@ -495,7 +527,7 @@ Tarefa: preencher ficha a partir da descrição (+ web).`;
       ...result,
       model: modelUsed,
       webSearch,
-      useUploadedCover: isImage && result.capaOrigem === "nenhuma",
+      useUploadedCover: isImage && !result.capa,
     });
   } catch (e) {
     if (e instanceof OpenRouterError) {

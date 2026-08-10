@@ -6,6 +6,16 @@ import { FormEvent, useEffect, useMemo, useRef, useState, useTransition } from "
 import { BookCapture, type CaptureMode } from "@/components/book-capture";
 import { PhoneQrModal } from "@/components/phone-qr-modal";
 import { createBook, updateBook } from "@/lib/books/actions";
+import {
+  cropDataUrlToCover,
+  cropWithFallback,
+} from "@/lib/isbn/cover-crop-client";
+import {
+  fallbackBookBBox,
+  isDataCoverUrl,
+  isHttpCoverUrl,
+  type CoverBBox,
+} from "@/lib/isbn/cover-crop";
 import { mergeData } from "@/lib/isbn/merge";
 import {
   isPlausibleCoverUrl,
@@ -165,6 +175,16 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
   const [condition, setCondition] = useState(initial?.condition || "");
   const [coverType, setCoverType] = useState(initial?.coverType || "Brochura");
   const [coverUrl, setCoverUrl] = useState(initial?.coverUrl || "");
+  const [photoRaw, setPhotoRaw] = useState("");
+  const [coverKind, setCoverKind] = useState<"web" | "photo" | "">(
+    initial?.coverUrl
+      ? isHttpCoverUrl(initial.coverUrl)
+        ? "web"
+        : isDataCoverUrl(initial.coverUrl)
+          ? "photo"
+          : ""
+      : "",
+  );
   const [tagsSet, setTagsSet] = useState<Set<string>>(
     () => new Set(initial?.tagsList || []),
   );
@@ -174,6 +194,52 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
 
   const tags = useMemo(() => [...tagsSet], [tagsSet]);
   const yearMax = new Date().getFullYear();
+
+  function pickWebCover(url: string | null | undefined): string {
+    const u = (url || "").trim();
+    if (
+      isHttpCoverUrl(u) &&
+      isPlausibleCoverUrl(u) &&
+      !u.includes("covers.openlibrary.org/b/isbn/")
+    ) {
+      return u;
+    }
+    return "";
+  }
+
+  function applyCover(url: string, kind: "web" | "photo") {
+    setCoverUrl(url);
+    setCoverKind(kind);
+  }
+
+  async function cropPhotoForCover(raw: string): Promise<string> {
+    try {
+      const res = await fetch("/api/covers/crop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: raw }),
+      });
+      const d = (await res.json()) as { bbox?: CoverBBox };
+      const bbox = d.bbox || fallbackBookBBox();
+      return await cropDataUrlToCover(raw, bbox);
+    } catch {
+      return cropWithFallback(raw);
+    }
+  }
+
+  async function resolveFinalCover(opts: {
+    web?: string;
+    photo?: string;
+  }): Promise<{ url: string; kind: "web" | "photo" | "" }> {
+    const web = pickWebCover(opts.web);
+    if (web) return { url: web, kind: "web" };
+    const photo = (opts.photo || "").trim();
+    if (photo.startsWith("data:image/")) {
+      const cropped = await cropPhotoForCover(photo);
+      return { url: cropped, kind: "photo" };
+    }
+    return { url: "", kind: "" };
+  }
 
   function setSource(id: string, state: SrcState) {
     setSrc((s) => ({ ...s, [id]: state }));
@@ -286,10 +352,9 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     const enrich = opts?.mode === "enrich";
     const base = opts?.base;
     const keepCover = opts?.keepCover || "";
-    const preferKeepCover =
-      keepCover.startsWith("data:image/") ||
-      (keepCover && !merged.capa) ||
-      enrich;
+    const webFromMerge = pickWebCover(merged.capa);
+    const keepIsPhoto = isDataCoverUrl(keepCover);
+    const keepIsWeb = pickWebCover(keepCover);
 
     setIsbn(isbnN);
 
@@ -330,17 +395,13 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
       if (!base.weight.trim() && merged.peso) setWeight(String(merged.peso));
       if (merged.tipoCapa) setCoverType(merged.tipoCapa);
 
-      // Capa: foto/upload sempre vence; catálogo só se keepCover vazio e capa plausível
-      if (preferKeepCover && keepCover) {
-        setCoverUrl(keepCover);
-      } else if (
-        merged.capa &&
-        isPlausibleCoverUrl(merged.capa) &&
-        !merged.capa.includes("covers.openlibrary.org/b/isbn/")
-      ) {
-        setCoverUrl(merged.capa);
-      } else if (keepCover) {
-        setCoverUrl(keepCover);
+      // Capa: web/catálogo vence; foto só se não houver HTTP
+      const chosenWeb = webFromMerge || keepIsWeb;
+      if (chosenWeb) {
+        applyCover(chosenWeb, "web");
+      } else if (keepIsPhoto) {
+        // mantém foto já resolvida no applyAiResult
+        applyCover(keepCover, "photo");
       }
 
       // Tags: só PT, e só se a IA trouxe poucas
@@ -352,12 +413,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
       );
       return {
         ok: true,
-        capa:
-          preferKeepCover && keepCover
-            ? keepCover
-            : merged.capa && isPlausibleCoverUrl(merged.capa)
-              ? merged.capa
-              : keepCover || undefined,
+        capa: chosenWeb || (keepIsPhoto ? keepCover : undefined),
       };
     }
 
@@ -373,14 +429,13 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     }
     if (merged.genero) setGenre(merged.genero);
     if (merged.idioma) setLanguage(merged.idioma);
-    const capaOk =
-      merged.capa &&
-      isPlausibleCoverUrl(merged.capa) &&
-      !merged.capa.includes("covers.openlibrary.org/b/isbn/")
-        ? merged.capa
-        : "";
-    if (capaOk) setCoverUrl(capaOk);
-    else if (opts?.keepCover) setCoverUrl(opts.keepCover);
+    const capaOk = webFromMerge;
+    if (capaOk) applyCover(capaOk, "web");
+    else if (opts?.keepCover && isHttpCoverUrl(opts.keepCover)) {
+      applyCover(opts.keepCover, "web");
+    } else if (opts?.keepCover && isDataCoverUrl(opts.keepCover)) {
+      applyCover(opts.keepCover, "photo");
+    }
     if (merged.paginas) setPages(String(merged.paginas));
     if (merged.peso && !weight) setWeight(String(merged.peso));
     if (merged.tipoCapa) setCoverType(merged.tipoCapa);
@@ -421,8 +476,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
       setIsbnMsg(e instanceof Error ? e.message : "Falha ao processar foto");
       return;
     }
-    // Foto enviada é a verdade visual até haver capa de catálogo validada
-    setCoverUrl(photoDataUrl);
+    setPhotoRaw(photoDataUrl);
     const res = await fetch("/api/isbn/ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -431,7 +485,8 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     const d = await res.json();
     if (!res.ok) {
       setIsbnMsg(d.error || "Falha na IA");
-      setCoverUrl(photoDataUrl);
+      const cropped = await cropPhotoForCover(photoDataUrl);
+      applyCover(cropped, "photo");
       return;
     }
     await applyAiResult(d, { uploadedCover: photoDataUrl });
@@ -442,6 +497,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     opts?: { uploadedCover?: string },
   ) {
     const photo = opts?.uploadedCover || "";
+    if (photo) setPhotoRaw(photo);
 
     if (d.titulo) setTitle(String(d.titulo));
     if (d.autor) setAuthor(String(d.autor));
@@ -467,19 +523,17 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     ]);
     aiTags.forEach(addTag);
 
-    const catalogCoverRaw =
-      typeof d.capa === "string" && isPlausibleCoverUrl(d.capa) ? d.capa : "";
-    // Nunca usar placeholder OL /b/isbn/…; foto vence
-    const catalogCover =
-      catalogCoverRaw &&
-      !catalogCoverRaw.includes("covers.openlibrary.org/b/isbn/")
-        ? catalogCoverRaw
-        : "";
+    const catalogCover = pickWebCover(
+      typeof d.capa === "string" ? d.capa : "",
+    );
 
-    if (photo) {
-      setCoverUrl(photo);
-    } else if (catalogCover) {
-      setCoverUrl(catalogCover);
+    // Capa: web primeiro; senão foto recortada
+    const initialCover = await resolveFinalCover({
+      web: catalogCover,
+      photo,
+    });
+    if (initialCover.url) {
+      applyCover(initialCover.url, initialCover.kind === "web" ? "web" : "photo");
     }
 
     const isbnFound =
@@ -510,37 +564,110 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
         d.tipoCapa === "Brochura" || d.tipoCapa === "Capa Dura"
           ? d.tipoCapa
           : "Brochura",
-      coverUrl: photo || catalogCover || "",
+      coverUrl: initialCover.url || catalogCover || "",
       tagsCount: aiTags.length,
     };
 
     if (isbnFound && d.isbnConfirmado === true) {
       setIsbnBusca(isbnFound);
-      setIsbnMsg(`${src}${conf} — enriquecendo com fontes (sem sobrescrever)…`);
+      setIsbnMsg(`${src}${conf} — buscando capa/ficha nas fontes…`);
       const r = await buscarISBN(isbnFound, {
         soft: true,
         mode: "enrich",
         base: snapshot,
-        keepCover: photo || catalogCover || undefined,
+        // Preferir web já encontrada; foto só como fallback no enrich
+        keepCover: catalogCover || initialCover.url || undefined,
       });
       if (r.ok) {
-        // Garante foto se catálogo não trouxe capa boa
-        if (photo) setCoverUrl(photo);
-        setIsbnMsg(`${src}${conf} · ficha da IA preservada · ISBN ${isbnFound}${extra}`);
+        const enrichWeb = pickWebCover(r.capa);
+        if (enrichWeb) {
+          applyCover(enrichWeb, "web");
+          setIsbnMsg(
+            `${src}${conf} · capa da web · ISBN ${isbnFound}${extra}`,
+          );
+        } else if (initialCover.kind === "photo") {
+          setIsbnMsg(
+            `${src}${conf} · foto ajustada (sem capa online) · ISBN ${isbnFound}${extra}`,
+          );
+        } else {
+          setIsbnMsg(
+            `${src}${conf} · ficha da IA preservada · ISBN ${isbnFound}${extra}`,
+          );
+        }
         return;
       }
       setIsbn(isbnFound);
-      if (photo) setCoverUrl(photo);
       setIsbnMsg(
-        `${src}${conf} · ISBN ${isbnFound} registrado; fontes extras sem dados · capa da foto mantida.`,
+        initialCover.kind === "web"
+          ? `${src}${conf} · capa da web · ISBN ${isbnFound}${extra}`
+          : `${src}${conf} · foto ajustada · ISBN ${isbnFound}${extra}`,
       );
       return;
     }
 
     setIsbn("");
     if (!isbnFound) setIsbnBusca("");
-    if (photo) setCoverUrl(photo);
-    setIsbnMsg(`Preenchido por ${src}${conf}${extra}`);
+    setIsbnMsg(
+      initialCover.kind === "web"
+        ? `Preenchido por ${src}${conf} · capa da web${extra}`
+        : initialCover.kind === "photo"
+          ? `Preenchido por ${src}${conf} · foto ajustada (sem capa online)${extra}`
+          : `Preenchido por ${src}${conf}${extra}`,
+    );
+  }
+
+  async function refetchWebCover() {
+    const code = (isbn || isbnBusca).trim();
+    if (looksLikeIsbnQuery(code)) {
+      setIsbnMsg("Buscando capa na web pelo ISBN…");
+      const r = await buscarISBN(code, {
+        soft: true,
+        mode: "replace",
+        keepCover: coverUrl || undefined,
+      });
+      if (r.capa && pickWebCover(r.capa)) {
+        applyCover(pickWebCover(r.capa), "web");
+        setIsbnMsg("Capa da web atualizada.");
+      } else {
+        setIsbnMsg("Não achei capa melhor na web.");
+      }
+      return;
+    }
+    const q = [title, author].filter(Boolean).join(" ").trim();
+    if (q.length < 3) {
+      setIsbnMsg("Informe título/autor ou ISBN para buscar capa.");
+      return;
+    }
+    setIsbnMsg("Buscando capa na web…");
+    const res = await fetch("/api/isbn/ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: q, webSearch: true }),
+    });
+    const d = await res.json();
+    if (!res.ok) {
+      setIsbnMsg(d.error || "Falha ao buscar capa");
+      return;
+    }
+    const web = pickWebCover(typeof d.capa === "string" ? d.capa : "");
+    if (web) {
+      applyCover(web, "web");
+      setIsbnMsg("Capa da web atualizada.");
+    } else {
+      setIsbnMsg("Não achei capa melhor na web.");
+    }
+  }
+
+  function useMyPhoto() {
+    if (!photoRaw) {
+      setIsbnMsg("Nenhuma foto de capa disponível nesta sessão.");
+      return;
+    }
+    void (async () => {
+      const cropped = await cropPhotoForCover(photoRaw);
+      applyCover(cropped, "photo");
+      setIsbnMsg("Usando sua foto (ajustada).");
+    })();
   }
 
   function openCapture(mode: CaptureMode) {
@@ -1070,7 +1197,20 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
 
           <div>
             <div className="card sticky top-[70px]">
-              <div className="card-header">Capa do Livro</div>
+              <div className="card-header flex items-center justify-between gap-2">
+                <span>Capa do Livro</span>
+                {coverKind ? (
+                  <span
+                    className={
+                      coverKind === "web"
+                        ? "cover-badge web"
+                        : "cover-badge photo"
+                    }
+                  >
+                    {coverKind === "web" ? "Web" : "Foto"}
+                  </span>
+                ) : null}
+              </div>
               <div className="card-body text-center">
                 {coverUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -1087,7 +1227,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
                 ) : (
                   <div className="py-8 text-muted">
                     <div className="mb-2 text-3xl opacity-25">🖼️</div>
-                    <small>Carregada pelo ISBN</small>
+                    <small>Sem capa ainda</small>
                   </div>
                 )}
                 <label className="form-label w-full text-start">URL da Capa</label>
@@ -1095,22 +1235,50 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
                   type="text"
                   className="form-control form-control-sm"
                   value={coverUrl}
-                  onChange={(e) => setCoverUrl(e.target.value)}
-                  placeholder="https://… ou foto da IA"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setCoverUrl(v);
+                    setCoverKind(
+                      isHttpCoverUrl(v)
+                        ? "web"
+                        : isDataCoverUrl(v)
+                          ? "photo"
+                          : "",
+                    );
+                  }}
+                  placeholder="https://… (preferencial) ou foto"
                 />
                 <div className="form-text text-start">
-                  Catálogo (Google/OL) tem prioridade; se não achar, usa a foto
-                  enviada.
+                  Preferimos capa limpa da web. A foto só entra (recortada) se não
+                  houver imagem online.
                 </div>
-                {isEdit ? (
+                <div className="mt-2 flex flex-col gap-1.5">
                   <button
                     type="button"
-                    className="mt-2 w-full rounded-md border border-line px-3 py-2 text-sm"
-                    onClick={() => void buscarISBN(isbn)}
+                    className="btn-outline w-full text-sm"
+                    onClick={() => void refetchWebCover()}
                   >
-                    Recarregar pelo ISBN
+                    Buscar capa na web de novo
                   </button>
-                ) : null}
+                  {photoRaw ? (
+                    <button
+                      type="button"
+                      className="btn-outline w-full text-sm"
+                      onClick={useMyPhoto}
+                    >
+                      Usar minha foto
+                    </button>
+                  ) : null}
+                  {isbn ? (
+                    <button
+                      type="button"
+                      className="btn-outline w-full text-sm"
+                      onClick={() => void buscarISBN(isbn)}
+                    >
+                      Recarregar ficha pelo ISBN
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>
