@@ -90,11 +90,12 @@ export async function createOrderInternal(opts: {
 
       return ord.id;
     });
-    revalidatePath("/painel/livros");
-    revalidatePath("/painel/pedidos");
-    revalidatePath(`/painel/pedidos/${orderId}`);
-    revalidatePath(`/painel/clientes/${opts.clientId}`);
-    revalidatePath("/painel");
+    revalidatePath("/painel/livros", "layout");
+    revalidatePath("/painel/livros", "page");
+    revalidatePath("/painel/pedidos", "layout");
+    revalidatePath(`/painel/pedidos/${orderId}`, "page");
+    revalidatePath(`/painel/clientes/${opts.clientId}`, "page");
+    revalidatePath("/painel", "layout");
     return { ok: true, id: orderId };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
