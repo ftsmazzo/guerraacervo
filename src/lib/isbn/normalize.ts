@@ -88,3 +88,64 @@ export function detectCapa(
   if (/paperback|softcover|brochura|trade/.test(lc)) return "Brochura";
   return null;
 }
+
+/** Valida dígito verificador ISBN-10 / ISBN-13 */
+export function isValidIsbnChecksum(raw: string): boolean {
+  const isbn = raw.replace(/[-\s]/g, "").toUpperCase();
+  if (isbn.length === 10) {
+    let s = 0;
+    for (let i = 0; i < 9; i++) {
+      const d = parseInt(isbn[i], 10);
+      if (Number.isNaN(d)) return false;
+      s += d * (10 - i);
+    }
+    const check = isbn[9] === "X" ? 10 : parseInt(isbn[9], 10);
+    if (Number.isNaN(check)) return false;
+    return s % 11 === check;
+  }
+  if (isbn.length === 13 && /^\d{13}$/.test(isbn)) {
+    if (!isbn.startsWith("978") && !isbn.startsWith("979")) return false;
+    let s = 0;
+    for (let i = 0; i < 12; i++) {
+      s += parseInt(isbn[i], 10) * (i % 2 === 0 ? 1 : 3);
+    }
+    const check = (10 - (s % 10)) % 10;
+    return check === parseInt(isbn[12], 10);
+  }
+  return false;
+}
+
+/**
+ * Recusa capas inventadas (ex.: URL terminando só com o ISBN)
+ * e aceita data URLs / CDNs de imagem conhecidos.
+ */
+export function isPlausibleCoverUrl(url: string): boolean {
+  const u = (url || "").trim();
+  if (!u) return false;
+  if (u.startsWith("data:image/")) return true;
+  let parsed: URL;
+  try {
+    parsed = new URL(u);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return false;
+  }
+  const path = parsed.pathname;
+  // Path que é só o ISBN (ou /isbn/978…) sem arquivo de imagem
+  if (/\/(?:isbn[/-]?)?\d{10,13}\/?$/i.test(path) && !/\.(jpe?g|png|webp|gif)(\?|$)/i.test(path)) {
+    return false;
+  }
+  const host = parsed.hostname.toLowerCase();
+  const trusted =
+    /(openlibrary\.org|googleapis\.com|googleusercontent\.com|books\.google|amazon\.|ssl-images-amazon|estantevirtual|skoob|cloudfront|wikimedia|goodreads|static\.|cdn\.)/i.test(
+      host,
+    );
+  const looksImage =
+    /\.(jpe?g|png|webp|gif)(\?|$)/i.test(path) ||
+    /\/(covers?|images?|img|photos?|media)\b/i.test(path) ||
+    parsed.searchParams.has("id") ||
+    /zoom=\d/.test(parsed.search);
+  return trusted || looksImage;
+}

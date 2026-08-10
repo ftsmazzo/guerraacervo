@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
   emptyLookup,
+  isPlausibleCoverUrl,
+  isValidIsbnChecksum,
   normISBN,
   type BookLookupResult,
 } from "@/lib/isbn/normalize";
@@ -11,6 +13,7 @@ import {
   resolveOpenRouterConfig,
   type AiBookPartial,
 } from "@/lib/isbn/openrouter";
+import { findCoverByTitleAuthor, verifyIsbnExists } from "@/lib/isbn/verify";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 90;
@@ -50,23 +53,30 @@ function parseAiJson(content: string): AiBookPartial {
 function cleanIsbn(raw: unknown): string {
   if (typeof raw !== "string" || !raw.trim()) return "";
   const digits = raw.replace(/[^\dXx]/g, "");
-  if (digits.length < 10) return "";
+  if (!isValidIsbnChecksum(digits)) return "";
   try {
     return normISBN(digits);
   } catch {
-    return digits;
+    return "";
   }
 }
 
 function toResult(
   partial: AiBookPartial,
   src: string,
-): BookLookupResult & { isbn: string; confianca: number | null } {
+): BookLookupResult & {
+  isbn: string;
+  confianca: number | null;
+  isbnConfirmado: boolean;
+  capaOrigem: "ia" | "catalogo" | "titulo" | "nenhuma";
+  avisos: string[];
+} {
   const base = emptyLookup(src);
   const tipo =
     partial.tipoCapa === "Brochura" || partial.tipoCapa === "Capa Dura"
       ? partial.tipoCapa
       : null;
+  const capaRaw = String(partial.capa || "").trim();
   return {
     ...base,
     titulo: String(partial.titulo || ""),
@@ -78,7 +88,7 @@ function toResult(
     editora: String(partial.editora || ""),
     ano: String(partial.ano || "").match(/\d{4}/)?.[0] || "",
     sinopse: String(partial.sinopse || ""),
-    capa: String(partial.capa || ""),
+    capa: isPlausibleCoverUrl(capaRaw) ? capaRaw : "",
     genero: String(partial.genero || ""),
     idioma: String(partial.idioma || ""),
     tipoCapa: tipo,
@@ -95,16 +105,21 @@ function toResult(
       Number.isFinite(partial.confianca)
         ? Math.max(0, Math.min(1, partial.confianca))
         : null,
+    isbnConfirmado: false,
+    capaOrigem: isPlausibleCoverUrl(capaRaw) ? "ia" : "nenhuma",
+    avisos: [],
   };
 }
 
-const SYSTEM_BASE = `Você é um catalogador de sebo brasileiro. Preencha a ficha do livro com o máximo de precisão.
-Regras:
-- Prefira ISBN-13 (978/979). Se só houver ISBN-10, converta mentalmente ou informe o que encontrar.
+const SYSTEM_BASE = `Você é um catalogador de sebo brasileiro. Preencha a ficha do livro com precisão.
+Regras CRÍTICAS:
+- NUNCA invente ISBN. Só preencha isbn se ele aparecer na capa/foto OU for confirmado claramente nos resultados da web (mesmo título+autor+editora). Caso contrário isbn = "".
+- NUNCA invente URL de capa. Campo "capa" só com URL real de imagem (jpg/png/webp) de CDN confiável. Se não tiver, capa = "".
+- NÃO use URLs que terminem só com o número do ISBN (ex.: .../978...). Isso é inválido.
 - Tags curtas em português.
-- Não invente ISBN. Se não tiver certeza, deixe isbn vazio e baixe confianca.
-- tipoCapa só "Brochura" ou "Capa Dura" quando visível/conhecido.
-- Use dados da web quando disponíveis para confirmar título, autor, editora e ISBN.`;
+- tipoCapa: "Brochura" ou "Capa Dura" só se visível/conhecido; senão "".
+- Prefira ISBN-13 (978/979) quando confirmado.
+- Se houver várias edições, escolha a edição brasileira mais comum e baixe confianca se houver dúvida.`;
 
 export async function POST(request: Request) {
   const cfg = resolveOpenRouterConfig();
@@ -140,15 +155,16 @@ export async function POST(request: Request) {
 
   const system = isImage
     ? `${SYSTEM_BASE}
-Tarefa: identificar o livro pela foto da capa (OCR do título/autor/selo + busca web se habilitada).`
+Tarefa: identificar o livro pela foto da capa (OCR título/autor/selo + web).
+Deixe capa="" — o sistema usará a foto enviada ou buscará capa real no catálogo.`
     : `${SYSTEM_BASE}
-Tarefa: preencher ficha a partir da descrição/busca textual do usuário (+ web se habilitada).`;
+Tarefa: preencher ficha a partir da descrição/busca textual (+ web).`;
 
   const userContent = isImage
     ? [
         {
           type: "text" as const,
-          text: "Identifique o livro nesta capa e preencha todos os campos do schema. Extraia ISBN se aparecer na imagem ou na web.",
+          text: "Identifique o livro nesta capa. Preencha título/autor/editora/sinopse. ISBN só se confirmado. capa deve ficar vazia.",
         },
         {
           type: "image_url" as const,
@@ -159,7 +175,7 @@ Tarefa: preencher ficha a partir da descrição/busca textual do usuário (+ web
           },
         },
       ]
-    : `Descrição / busca do livro:\n${dataIn.query}\n\nPreencha a ficha completa. Se possível, resolva o ISBN-13.`;
+    : `Descrição / busca do livro:\n${dataIn.query}\n\nPreencha a ficha. ISBN só se confirmado na web. Não invente URL de capa.`;
 
   try {
     const { content, modelUsed } = await openRouterChat({
@@ -177,7 +193,9 @@ Tarefa: preencher ficha a partir da descrição/busca textual do usuário (+ web
     const partial = parseAiJson(content);
     const result = toResult(
       partial,
-      isImage ? `IA OpenRouter capa (${modelUsed})` : `IA OpenRouter (${modelUsed})`,
+      isImage
+        ? `IA OpenRouter capa (${modelUsed})`
+        : `IA OpenRouter (${modelUsed})`,
     );
 
     if (!result.titulo) {
@@ -187,10 +205,47 @@ Tarefa: preencher ficha a partir da descrição/busca textual do usuário (+ web
       );
     }
 
+    if (result.isbn) {
+      const verified = await verifyIsbnExists(result.isbn);
+      if (verified.ok) {
+        result.isbn = verified.isbn13;
+        result.isbnConfirmado = true;
+        if (!result.capa && verified.capa) {
+          result.capa = verified.capa;
+          result.capaOrigem = "catalogo";
+        }
+      } else {
+        result.avisos.push(
+          `ISBN ${result.isbn} não encontrado em Google Books/Open Library — descartado.`,
+        );
+        result.isbn = "";
+        result.isbnConfirmado = false;
+        if (typeof result.confianca === "number") {
+          result.confianca = Math.min(result.confianca, 0.55);
+        }
+      }
+    }
+
+    if (!result.capa) {
+      const found = await findCoverByTitleAuthor(result.titulo, result.autor);
+      if (found) {
+        result.capa = found;
+        result.capaOrigem = "titulo";
+      }
+    }
+
+    if (isImage && !result.capa) {
+      result.capaOrigem = "nenhuma";
+      result.avisos.push(
+        "Capa de catálogo não encontrada — use a foto enviada no formulário.",
+      );
+    }
+
     return NextResponse.json({
       ...result,
       model: modelUsed,
       webSearch,
+      useUploadedCover: isImage && result.capaOrigem === "nenhuma",
     });
   } catch (e) {
     if (e instanceof OpenRouterError) {

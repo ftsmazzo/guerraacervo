@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createBook, updateBook } from "@/lib/books/actions";
 import { mergeData } from "@/lib/isbn/merge";
-import { normISBN } from "@/lib/isbn/normalize";
+import { isPlausibleCoverUrl, normISBN } from "@/lib/isbn/normalize";
 import {
   fetchGoogle,
   fetchHathiTrust,
@@ -14,6 +14,36 @@ import {
   fetchOpenLibrarySearch,
   fetchPhpScraper,
 } from "@/lib/isbn/sources-client";
+
+/** Reduz foto para data-URL usável como capa no formulário */
+async function fileToCoverDataUrl(file: File, maxSide = 900): Promise<string> {
+  const raw = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Falha ao ler imagem"));
+    reader.readAsDataURL(file);
+  });
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Imagem inválida"));
+      el.src = raw;
+    });
+    const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return raw;
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL("image/jpeg", 0.82);
+  } catch {
+    return raw;
+  }
+}
 
 const TAG_COLORS = [
   "#e67e22",
@@ -153,13 +183,16 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     return () => clearTimeout(t);
   }, [tagInput, tagsSet]);
 
-  async function buscarISBN(code?: string) {
+  async function buscarISBN(
+    code?: string,
+    opts?: { soft?: boolean; keepCover?: string },
+  ): Promise<{ ok: boolean; capa?: string }> {
     const raw = (code ?? isbnBusca).trim();
-    if (!raw) return;
+    if (!raw) return { ok: false };
     const isbnN = normISBN(raw);
     setIsbnBusca(isbnN);
     setShowProgress(true);
-    setIsbnMsg(null);
+    if (!opts?.soft) setIsbnMsg(null);
     const ids = ["google", "openlib", "hathi", "ml", "olsearch", "php"] as const;
     ids.forEach((id) => setSource(id, "searching"));
 
@@ -193,8 +226,10 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     const results = await Promise.all(tasks);
     const merged = mergeData(results);
     if (!merged?.titulo) {
-      setIsbnMsg("Nenhuma fonte retornou dados para este ISBN.");
-      return;
+      if (!opts?.soft) {
+        setIsbnMsg("Nenhuma fonte retornou dados para este ISBN.");
+      }
+      return { ok: false };
     }
     setIsbn(isbnN);
     setTitle(merged.titulo);
@@ -204,7 +239,13 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     if (merged.sinopse) setSynopsis(merged.sinopse);
     if (merged.genero) setGenre(merged.genero);
     if (merged.idioma) setLanguage(merged.idioma);
-    if (merged.capa) setCoverUrl(merged.capa);
+    const capaOk =
+      merged.capa && isPlausibleCoverUrl(merged.capa) ? merged.capa : "";
+    if (capaOk) {
+      setCoverUrl(capaOk);
+    } else if (opts?.keepCover) {
+      setCoverUrl(opts.keepCover);
+    }
     if (merged.paginas) setPages(String(merged.paginas));
     if (merged.peso && !weight) setWeight(String(merged.peso));
     if (merged.tipoCapa) setCoverType(merged.tipoCapa);
@@ -212,6 +253,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     setIsbnMsg(
       `Dados mesclados de: ${merged.fontes.join(" + ") || "fontes disponíveis"}`,
     );
+    return { ok: true, capa: capaOk || undefined };
   }
 
   async function buscarIATexto() {
@@ -232,26 +274,28 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
 
   async function buscarIAFoto(file: File) {
     setIsbnMsg("Analisando foto da capa (IA + web)…");
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(new Error("Falha ao ler imagem"));
-      reader.readAsDataURL(file);
-    });
+    const photoDataUrl = await fileToCoverDataUrl(file);
+    // Já mostra a foto enquanto a IA trabalha
+    setCoverUrl(photoDataUrl);
     const res = await fetch("/api/isbn/ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageBase64: dataUrl, webSearch: true }),
+      body: JSON.stringify({ imageBase64: photoDataUrl, webSearch: true }),
     });
     const d = await res.json();
     if (!res.ok) {
       setIsbnMsg(d.error || "Falha na IA");
+      // mantém a foto enviada
+      setCoverUrl(photoDataUrl);
       return;
     }
-    await applyAiResult(d);
+    await applyAiResult(d, { uploadedCover: photoDataUrl });
   }
 
-  async function applyAiResult(d: Record<string, unknown>) {
+  async function applyAiResult(
+    d: Record<string, unknown>,
+    opts?: { uploadedCover?: string },
+  ) {
     if (d.titulo) setTitle(String(d.titulo));
     if (d.autor) setAuthor(String(d.autor));
     if (d.editora) setPublisher(String(d.editora));
@@ -259,7 +303,6 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     if (d.sinopse) setSynopsis(String(d.sinopse));
     if (d.genero) setGenre(String(d.genero));
     if (d.idioma) setLanguage(String(d.idioma));
-    if (d.capa) setCoverUrl(String(d.capa));
     if (d.paginas) setPages(String(d.paginas));
     if (d.tipoCapa === "Brochura" || d.tipoCapa === "Capa Dura") {
       setCoverType(d.tipoCapa);
@@ -268,6 +311,18 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
       setWeight(String(d.peso));
     }
     if (Array.isArray(d.tags)) d.tags.forEach((t) => addTag(String(t)));
+
+    const catalogCover =
+      typeof d.capa === "string" && isPlausibleCoverUrl(d.capa) ? d.capa : "";
+    const photo = opts?.uploadedCover || "";
+    // Prioridade: capa de catálogo real > foto enviada > nada
+    if (catalogCover) {
+      setCoverUrl(catalogCover);
+    } else if (photo) {
+      setCoverUrl(photo);
+    } else if (d.useUploadedCover && photo) {
+      setCoverUrl(photo);
+    }
 
     const isbnFound =
       typeof d.isbn === "string" && d.isbn.replace(/\D/g, "").length >= 10
@@ -278,16 +333,38 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
         ? ` · confiança ${Math.round(d.confianca * 100)}%`
         : "";
     const src = String(d._src || d.model || "IA");
+    const avisos = Array.isArray(d.avisos)
+      ? d.avisos.map(String).filter(Boolean)
+      : [];
+    const extra = avisos.length ? ` · ${avisos.join(" ")}` : "";
 
-    if (isbnFound) {
-      setIsbn(isbnFound);
+    // Só dispara motores quando o servidor confirmou o ISBN em catálogo
+    if (isbnFound && d.isbnConfirmado === true) {
       setIsbnBusca(isbnFound);
-      setIsbnMsg(`${src}${conf} — disparando motores ISBN…`);
-      await buscarISBN(isbnFound);
+      setIsbnMsg(`${src}${conf} — confirmando nas fontes…`);
+      const r = await buscarISBN(isbnFound, {
+        soft: true,
+        keepCover: catalogCover || photo || undefined,
+      });
+      if (r.ok) {
+        if (!r.capa && (catalogCover || photo)) {
+          setCoverUrl(catalogCover || photo);
+        }
+        setIsbnMsg(`${src}${conf} · ISBN confirmado${extra}`);
+        return;
+      }
+      setIsbn(isbnFound);
+      if (!catalogCover && photo) setCoverUrl(photo);
+      setIsbnMsg(
+        `${src}${conf} · ISBN ${isbnFound} sem retorno nas fontes — mantendo ficha da IA e capa da foto.`,
+      );
       return;
     }
 
-    setIsbnMsg(`Preenchido por ${src}${conf}`);
+    setIsbn("");
+    if (!isbnFound) setIsbnBusca("");
+    if (!catalogCover && photo) setCoverUrl(photo);
+    setIsbnMsg(`Preenchido por ${src}${conf}${extra}`);
   }
 
   async function abrirScanner() {
@@ -834,14 +911,15 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
                 )}
                 <label className="form-label w-full text-start">URL da Capa</label>
                 <input
-                  type="url"
+                  type="text"
                   className="form-control form-control-sm"
                   value={coverUrl}
                   onChange={(e) => setCoverUrl(e.target.value)}
-                  placeholder="https://…"
+                  placeholder="https://… ou foto da IA"
                 />
                 <div className="form-text text-start">
-                  Preenchida automaticamente pela busca ISBN
+                  Catálogo (Google/OL) tem prioridade; se não achar, usa a foto
+                  enviada.
                 </div>
                 {isEdit ? (
                   <button

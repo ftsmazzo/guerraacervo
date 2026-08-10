@@ -25,10 +25,15 @@ export const BOOK_JSON_SCHEMA = {
       ano: { type: "string", description: "Ano AAAA ou vazio" },
       isbn: {
         type: "string",
-        description: "ISBN-13 preferencial, só dígitos, ou vazio",
+        description:
+          "ISBN-13 confirmado (só dígitos) ou string vazia — NUNCA inventar",
       },
       sinopse: { type: "string" },
-      capa: { type: "string", description: "URL da capa se conhecida" },
+      capa: {
+        type: "string",
+        description:
+          "URL https real de imagem de capa, ou vazio. Nunca URL terminando só com ISBN.",
+      },
       genero: { type: "string" },
       idioma: { type: "string", description: "Ex: Português" },
       paginas: { type: ["integer", "null"] },
