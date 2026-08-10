@@ -35,6 +35,10 @@ export const BOOK_JSON_SCHEMA = {
           "URL https real de imagem de capa, ou vazio. Nunca URL terminando só com ISBN.",
       },
       genero: { type: "string" },
+      colecao: {
+        type: "string",
+        description: "Coleção/série se houver (ex: Reencontro Literatura)",
+      },
       idioma: { type: "string", description: "Ex: Português" },
       paginas: { type: ["integer", "null"] },
       tipoCapa: {
@@ -64,6 +68,7 @@ export const BOOK_JSON_SCHEMA = {
       "sinopse",
       "capa",
       "genero",
+      "colecao",
       "idioma",
       "paginas",
       "tipoCapa",
@@ -74,9 +79,52 @@ export const BOOK_JSON_SCHEMA = {
   },
 } as const;
 
+/** Passagem 2: só resolver ISBN/peso com busca web aberta */
+export const ISBN_LOOKUP_SCHEMA = {
+  name: "resolver_isbn",
+  strict: true,
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      isbn: {
+        type: "string",
+        description: "ISBN-13 confirmado na web ou vazio",
+      },
+      paginas: { type: ["integer", "null"] },
+      peso: {
+        type: ["integer", "null"],
+        description: "Peso em gramas se a fonte informar",
+      },
+      capa: {
+        type: "string",
+        description: "URL real de imagem ou vazio",
+      },
+      editora: { type: "string" },
+      ano: { type: "string" },
+      confianca: { type: "number" },
+      fonte: {
+        type: "string",
+        description: "Site/fonte onde o ISBN foi visto",
+      },
+    },
+    required: [
+      "isbn",
+      "paginas",
+      "peso",
+      "capa",
+      "editora",
+      "ano",
+      "confianca",
+      "fonte",
+    ],
+  },
+} as const;
+
 export type AiBookPartial = Partial<BookLookupResult> & {
   isbn?: string;
   confianca?: number;
+  colecao?: string;
 };
 
 export function resolveOpenRouterConfig() {
@@ -107,15 +155,27 @@ export function resolveOpenRouterConfig() {
   return { apiKey, model, fallbacks, webSearch, appUrl };
 }
 
-export function buildOpenRouterPlugins(webSearch: boolean) {
+export function buildOpenRouterPlugins(
+  webSearch: boolean,
+  opts?: {
+    unrestricted?: boolean;
+    maxResults?: number;
+    searchPrompt?: string;
+  },
+) {
   const plugins: Array<Record<string, unknown>> = [
     { id: "response-healing" },
   ];
   if (webSearch) {
-    plugins.push({
+    const web: Record<string, unknown> = {
       id: "web",
-      max_results: 4,
-      include_domains: [
+      max_results: opts?.maxResults ?? 5,
+      search_prompt:
+        opts?.searchPrompt ||
+        "Resultados da web sobre o livro (título, autor, ISBN-13, editora, coleção, peso em gramas, páginas). Prefira edição brasileira. Só use ISBN se aparecer explicitamente na fonte.",
+    };
+    if (!opts?.unrestricted) {
+      web.include_domains = [
         "openlibrary.org",
         "books.google.com",
         "worldcat.org",
@@ -123,15 +183,16 @@ export function buildOpenRouterPlugins(webSearch: boolean) {
         "amazon.com",
         "estantevirtual.com.br",
         "skoob.com.br",
-        "livraria.com.br",
-        "submarino.com.br",
-        "americanas.com.br",
         "isbnsearch.org",
         "isbndb.com",
-      ],
-      search_prompt:
-        "Resultados da web sobre o livro (título, autor, ISBN, editora, edição). Use para preencher a ficha com dados verificáveis. Prefira ISBN-13 brasileiro quando houver.",
-    });
+        "wikipedia.org",
+        "scipione.com.br",
+        "moderna.com.br",
+        "atica.com.br",
+        "companhiadasletras.com.br",
+      ];
+    }
+    plugins.push(web);
   }
   return plugins;
 }
@@ -147,24 +208,35 @@ export async function openRouterChat(opts: {
   }>;
   webSearch: boolean;
   temperature?: number;
+  webOpts?: {
+    unrestricted?: boolean;
+    maxResults?: number;
+    searchPrompt?: string;
+  };
+  /** Schema JSON custom (default BOOK_JSON_SCHEMA). */
+  jsonSchema?: unknown;
+  /** Se false, não força json_schema. Default true. */
+  structured?: boolean;
 }): Promise<{
   content: string;
   modelUsed: string;
   annotations?: unknown[];
 }> {
+  const structured = opts.structured !== false;
   const body: Record<string, unknown> = {
     model: opts.model,
     temperature: opts.temperature ?? 0.15,
     messages: opts.messages,
-    response_format: {
-      type: "json_schema",
-      json_schema: BOOK_JSON_SCHEMA,
-    },
-    plugins: buildOpenRouterPlugins(opts.webSearch),
-    provider: {
-      require_parameters: true,
-    },
+    plugins: buildOpenRouterPlugins(opts.webSearch, opts.webOpts),
   };
+
+  if (structured) {
+    body.response_format = {
+      type: "json_schema",
+      json_schema: opts.jsonSchema || BOOK_JSON_SCHEMA,
+    };
+    body.provider = { require_parameters: true };
+  }
 
   if (opts.fallbacks.length) {
     body.models = [opts.model, ...opts.fallbacks];

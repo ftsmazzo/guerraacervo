@@ -307,10 +307,13 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     if (d.tipoCapa === "Brochura" || d.tipoCapa === "Capa Dura") {
       setCoverType(d.tipoCapa);
     }
-    if (typeof d.peso === "number" && d.peso > 0 && !weight) {
+    if (typeof d.peso === "number" && d.peso > 0) {
       setWeight(String(d.peso));
     }
     if (Array.isArray(d.tags)) d.tags.forEach((t) => addTag(String(t)));
+    if (typeof d.colecao === "string" && d.colecao.trim()) {
+      addTag(d.colecao.trim());
+    }
 
     const catalogCover =
       typeof d.capa === "string" && isPlausibleCoverUrl(d.capa) ? d.capa : "";
