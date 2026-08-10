@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LogoutButton } from "@/components/logout-button";
 import { requirePlatformAdmin } from "@/lib/auth/guards";
 
 export default async function AdminLayout({
@@ -37,9 +38,7 @@ export default async function AdminLayout({
             <Link href="/painel" className="text-muted hover:text-ink">
               Painel sebo
             </Link>
-            <Link href="/api/auth/logout" className="text-muted hover:text-ink">
-              Sair
-            </Link>
+            <LogoutButton className="text-muted hover:text-ink" />
           </nav>
         </div>
       </header>

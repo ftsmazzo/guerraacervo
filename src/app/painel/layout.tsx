@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { LogoutButton } from "@/components/logout-button";
 import {
   getAuthContext,
   hasEntitlement,
@@ -117,12 +118,7 @@ export default async function PainelLayout({
             <span className="hidden text-xs text-muted sm:inline">
               {ctx.user.email}
             </span>
-            <Link
-              href="/api/auth/logout"
-              className="text-sm text-muted hover:text-ink"
-            >
-              Sair
-            </Link>
+            <LogoutButton className="text-sm text-muted hover:text-ink" />
           </div>
         </header>
         {!access.ok ? (
