@@ -119,7 +119,7 @@ export default async function LivrosPage({
         order,
         dir,
       }),
-      listTagCloud(ctx.tenant.id),
+      listTagCloud(ctx.tenant.id, { activeTags }),
     ]);
   } catch (e) {
     loadError = e instanceof Error ? e.message : String(e);

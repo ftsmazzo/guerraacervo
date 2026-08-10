@@ -125,6 +125,20 @@ export async function setInstanceWebhook(
   });
 }
 
+/** Garante webhook ativo (após QR / troca de número / reconnect). */
+export async function ensureInstanceWebhook(
+  cfg: EvolutionConfig,
+  instance: string,
+): Promise<boolean> {
+  try {
+    await setInstanceWebhook(cfg, instance);
+    return true;
+  } catch (e) {
+    console.warn("[whatsapp] ensure webhook falhou", instance, e);
+    return false;
+  }
+}
+
 export async function sendTextMessage(
   cfg: EvolutionConfig,
   instance: string,

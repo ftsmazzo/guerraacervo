@@ -293,11 +293,53 @@ export async function getBook(tenantId: string, id: string) {
 
 export type TagCloudItem = { name: string; qtd: number };
 
+export type ListTagCloudOpts = {
+  /** Tags já ativas (AND) — contagens das demais tags só entre esses livros */
+  activeTags?: string[];
+  limit?: number;
+};
+
 export async function listTagCloud(
   tenantId: string,
-  limit = 100,
+  opts: ListTagCloudOpts | number = {},
 ): Promise<TagCloudItem[]> {
-  const qtdExpr = sql<number>`count(${bookTags.bookId})::int`;
+  const options: ListTagCloudOpts =
+    typeof opts === "number" ? { limit: opts } : opts;
+  const limit = options.limit ?? 100;
+  const activeTags = (options.activeTags || [])
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  let bookScope: string[] | null = null;
+  if (activeTags.length) {
+    const n = activeTags.length;
+    const filtered = await db
+      .select({
+        bookId: bookTags.bookId,
+      })
+      .from(bookTags)
+      .innerJoin(tags, eq(tags.id, bookTags.tagId))
+      .where(
+        and(
+          eq(tags.tenantId, tenantId),
+          inArray(tags.name, activeTags),
+        ),
+      )
+      .groupBy(bookTags.bookId)
+      .having(sql`COUNT(DISTINCT ${tags.name}) = ${n}`);
+    bookScope = filtered.map((r) => r.bookId);
+    if (!bookScope.length) return [];
+  }
+
+  const qtdExpr = sql<number>`count(DISTINCT ${bookTags.bookId})::int`;
+  const conditions: SQL[] = [
+    eq(tags.tenantId, tenantId),
+    eq(books.tenantId, tenantId),
+  ];
+  if (bookScope) {
+    conditions.push(inArray(bookTags.bookId, bookScope));
+  }
+
   const rows = await db
     .select({
       name: tags.name,
@@ -305,7 +347,8 @@ export async function listTagCloud(
     })
     .from(tags)
     .innerJoin(bookTags, eq(bookTags.tagId, tags.id))
-    .where(eq(tags.tenantId, tenantId))
+    .innerJoin(books, eq(books.id, bookTags.bookId))
+    .where(and(...conditions))
     .groupBy(tags.id, tags.name)
     .orderBy(desc(qtdExpr), asc(tags.name))
     .limit(limit);

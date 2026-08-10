@@ -16,6 +16,7 @@ import {
   logoutInstance,
   resolveEvolutionConfig,
   setInstanceWebhook,
+  ensureInstanceWebhook,
   waitForQr,
 } from "@/lib/whatsapp/evolution";
 import { getWhatsappConnection } from "@/lib/whatsapp/queries";
@@ -103,6 +104,11 @@ export async function connectWhatsapp(): Promise<WhatsappActionResult> {
     if (qr) status = "qr";
     if (!qr && status === "disconnected") status = "qr";
 
+    // Se já abriu no connect, reforça webhook
+    if (status === "open") {
+      await ensureInstanceWebhook(cfg, instance);
+    }
+
     await db
       .update(whatsappConnections)
       .set({
@@ -183,6 +189,8 @@ export async function refreshWhatsappStatus(): Promise<WhatsappActionResult> {
       }
     } else {
       qr = null;
+      // Reconexão / troca de número: webhook costuma sumir — reaplica sempre
+      await ensureInstanceWebhook(cfg, conn.instanceName);
     }
 
     await db
