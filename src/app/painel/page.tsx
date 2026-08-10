@@ -1,5 +1,6 @@
 import { getAuthContext, hasEntitlement } from "@/lib/auth/context";
 import { countTenantClients } from "@/lib/clients/queries";
+import { countOpenOrders } from "@/lib/orders/queries";
 import { canAddBook, countTenantBooks } from "@/lib/tenant-limits";
 import { getPlan } from "@/lib/plans";
 
@@ -17,6 +18,10 @@ export default async function PainelDashboardPage() {
     tenantId && hasEntitlement(planCode, "clients")
       ? await countTenantClients(tenantId)
       : null;
+  const openOrders =
+    tenantId && hasEntitlement(planCode, "orders")
+      ? await countOpenOrders(tenantId)
+      : null;
 
   const cards = [
     {
@@ -30,7 +35,10 @@ export default async function PainelDashboardPage() {
       label: "Clientes",
       value: clientCount === null ? "—" : String(clientCount),
     },
-    { label: "Pedidos abertos", value: "—" },
+    {
+      label: "Pedidos abertos",
+      value: openOrders === null ? "—" : String(openOrders),
+    },
     { label: "Receita do mês", value: "—" },
   ];
 

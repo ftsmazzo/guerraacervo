@@ -1,0 +1,377 @@
+/* Módulo Pedidos — estilo Renato */
+
+.pedidos-page .page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.pedidos-page .page-header h4 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.pedidos-page .btn-accent {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.45rem 0.9rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.pedidos-page .btn-accent:hover {
+  background: var(--accent-dark);
+}
+
+.pedidos-page .btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.85rem;
+  font-size: 0.875rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.pedidos-page .btn-outline:hover {
+  background: var(--accent-soft);
+}
+
+.pedidos-page .btn-sm {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.75rem;
+}
+
+.pedidos-page .card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.pedidos-page .card-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.pedidos-page .card-body {
+  padding: 1rem;
+}
+
+.pedidos-page .card-body.p-0 {
+  padding: 0;
+}
+
+.pedidos-page .card-title-icon {
+  color: var(--accent);
+}
+
+.pedidos-page .required-star {
+  color: #dc2626;
+}
+
+.pedidos-page .form-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 0.28rem;
+}
+
+.pedidos-page .form-control,
+.pedidos-page .form-select {
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.875rem;
+  background: #fff;
+  color: var(--ink);
+}
+
+.pedidos-page .form-control:focus,
+.pedidos-page .form-select:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-color: var(--accent);
+}
+
+.pedidos-page .form-text {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 0.25rem;
+}
+
+.pedidos-page .status-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.85rem;
+}
+
+.pedidos-page .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: #fff;
+  color: var(--ink);
+  font-size: 0.78rem;
+  text-decoration: none;
+}
+
+.pedidos-page .chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.pedidos-page .chip .n {
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  font-weight: 600;
+  font-size: 0.7rem;
+}
+
+.pedidos-page .chip.active .n {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.pedidos-page .filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.pedidos-page .table-wrap {
+  overflow-x: auto;
+}
+
+.pedidos-page table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.pedidos-page table.data th {
+  text-align: left;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  background: #faf8f5;
+}
+
+.pedidos-page table.data td {
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+  color: var(--ink);
+}
+
+.pedidos-page table.data tr:hover td {
+  background: color-mix(in srgb, var(--accent-soft) 50%, transparent);
+}
+
+.pedidos-page .empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 2.5rem 1rem;
+}
+
+.pedidos-page .badge-status {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pedidos-page .weight-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  align-items: center;
+  padding: 0.85rem 1.1rem;
+  background: linear-gradient(135deg, #fff7ed, #ffedd5);
+  border: 1px solid #fed7aa;
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  position: sticky;
+  top: 0.5rem;
+  z-index: 5;
+}
+
+.pedidos-page .wb-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.pedidos-page .wb-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.pedidos-page .wb-value.accent {
+  color: var(--accent);
+}
+
+.pedidos-page .row-g {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.pedidos-page .row-pedido {
+  grid-template-columns: 2fr 1fr 1fr;
+}
+
+@media (max-width: 800px) {
+  .pedidos-page .row-pedido {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pedidos-page .error-box {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  font-size: 0.85rem;
+}
+
+.pedidos-page .ok-box {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  font-size: 0.85rem;
+}
+
+.pedidos-page .breadcrumb {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.pedidos-page .breadcrumb a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.pedidos-page .search-results {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: 0.5rem;
+}
+
+.pedidos-page .search-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  background: #fff;
+  width: 100%;
+  text-align: left;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  font: inherit;
+}
+
+.pedidos-page .search-item:hover {
+  background: var(--accent-soft);
+}
+
+.pedidos-page .cart-cover {
+  width: 36px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 3px;
+  background: #eee;
+}
+
+.pedidos-page .qty-input {
+  width: 64px;
+  text-align: center;
+}
+
+.pedidos-page .detail-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 900px) {
+  .pedidos-page .detail-grid {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.pedidos-page .info-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (min-width: 700px) {
+  .pedidos-page .info-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.pedidos-page .info-lbl {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.pedidos-page .info-val {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.pedidos-page .form-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.pedidos-page textarea.form-control {
+  resize: vertical;
+  min-height: 4rem;
+}

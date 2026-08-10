@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getAuthContext, hasEntitlement } from "@/lib/auth/context";
 import { getClient } from "@/lib/clients/queries";
+import { listOrdersByClient } from "@/lib/orders/queries";
 import "../clientes.css";
 
 function money(v: string | number) {
@@ -22,6 +23,27 @@ function waHref(whatsapp: string) {
   return `https://wa.me/${withCountry}`;
 }
 
+function shortId(id: string) {
+  return id.slice(0, 8);
+}
+
+function statusStyle(status: string): { bg: string; color: string } {
+  switch (status) {
+    case "Aguardando Pagamento":
+      return { bg: "#fef3c7", color: "#92400e" };
+    case "Pago":
+      return { bg: "#dbeafe", color: "#1e40af" };
+    case "Enviado":
+      return { bg: "#e0f2fe", color: "#075985" };
+    case "Entregue":
+      return { bg: "#dcfce7", color: "#166534" };
+    case "Cancelado":
+      return { bg: "#fee2e2", color: "#991b1b" };
+    default:
+      return { bg: "#f5f5f4", color: "#44403c" };
+  }
+}
+
 export default async function ClienteViewPage({
   params,
 }: {
@@ -36,6 +58,11 @@ export default async function ClienteViewPage({
   const { id } = await params;
   const c = await getClient(ctx.tenant.id, id);
   if (!c) notFound();
+
+  const canOrders = hasEntitlement(ctx.tenant.planCode, "orders");
+  const pedidos = canOrders
+    ? await listOrdersByClient(ctx.tenant.id, id)
+    : [];
 
   const cityUf =
     c.city || c.state
@@ -63,13 +90,14 @@ export default async function ClienteViewPage({
           <Link href={`/painel/clientes/${c.id}/editar`} className="btn-outline">
             Editar
           </Link>
-          <span
-            className="btn-accent"
-            style={{ opacity: 0.55, cursor: "not-allowed" }}
-            title="Em breve"
-          >
-            Novo Pedido (em breve)
-          </span>
+          {canOrders ? (
+            <Link
+              href={`/painel/pedidos/novo?cliente_id=${c.id}`}
+              className="btn-accent"
+            >
+              Novo Pedido
+            </Link>
+          ) : null}
         </div>
       </div>
 
@@ -147,18 +175,82 @@ export default async function ClienteViewPage({
         <div className="card-header">
           <span className="card-title-icon">●</span> Histórico de Pedidos
         </div>
-        <div className="alert-soon">
-          O módulo de Pedidos chega no próximo sprint. Por enquanto, o histórico
-          aparece aqui assim que houver pedidos cadastrados —{" "}
-          <Link href="/painel/pedidos" style={{ color: "inherit", fontWeight: 600 }}>
-            em breve
-          </Link>
-          .
-        </div>
         <div className="card-body p-0">
-          <div className="empty" style={{ paddingTop: "1rem" }}>
-            Nenhum pedido encontrado
-          </div>
+          {!canOrders ? (
+            <div className="empty">Plano sem módulo de pedidos.</div>
+          ) : pedidos.length === 0 ? (
+            <div className="empty">Nenhum pedido encontrado</div>
+          ) : (
+            <div className="table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Data</th>
+                    <th style={{ textAlign: "center" }}>Livros</th>
+                    <th>Pagamento</th>
+                    <th style={{ textAlign: "end" }}>Valor</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: "center" }}>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pedidos.map((p) => {
+                    const st = statusStyle(p.status);
+                    return (
+                      <tr key={p.id}>
+                        <td>
+                          <Link
+                            href={`/painel/pedidos/${p.id}`}
+                            style={{
+                              fontWeight: 600,
+                              color: "var(--accent)",
+                              textDecoration: "none",
+                            }}
+                          >
+                            #{shortId(p.id)}
+                          </Link>
+                        </td>
+                        <td>{p.orderDate.toLocaleDateString("pt-BR")}</td>
+                        <td style={{ textAlign: "center" }}>
+                          <span className="badge">{p.itemCount}</span>
+                        </td>
+                        <td style={{ fontSize: "0.82rem" }}>
+                          {p.paymentMethod}
+                        </td>
+                        <td style={{ textAlign: "end", fontWeight: 600 }}>
+                          {money(p.totalAmount ?? 0)}
+                        </td>
+                        <td>
+                          <span
+                            style={{
+                              display: "inline-block",
+                              padding: "0.15rem 0.45rem",
+                              borderRadius: 999,
+                              fontSize: "0.72rem",
+                              fontWeight: 600,
+                              background: st.bg,
+                              color: st.color,
+                            }}
+                          >
+                            {p.status}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: "center" }}>
+                          <Link
+                            href={`/painel/pedidos/${p.id}`}
+                            className="btn-outline btn-sm"
+                          >
+                            Ver
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>
