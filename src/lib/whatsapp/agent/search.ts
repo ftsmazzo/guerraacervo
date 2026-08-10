@@ -97,6 +97,50 @@ export async function getClientInterestTagNames(
     .map((r) => r.tag.toLowerCase());
 }
 
+function normText(s: string) {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[.]/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Tokens úteis p/ autor/tema (ex.: "c s lewis" → ["cs","lewis"]). */
+export function queryTokens(q: string): string[] {
+  const raw = normText(q).split(" ").filter(Boolean);
+  const tokens: string[] = [];
+  let initials = "";
+  for (const t of raw) {
+    if (t.length === 1) {
+      initials += t;
+      continue;
+    }
+    if (initials.length >= 2) tokens.push(initials);
+    initials = "";
+    if (t.length >= 2) tokens.push(t);
+  }
+  if (initials.length >= 2) tokens.push(initials);
+  return tokens;
+}
+
+export function authorMatchesQuery(
+  author: string | null | undefined,
+  q: string,
+): boolean {
+  if (!author?.trim() || !q.trim()) return false;
+  const a = normText(author);
+  const tokens = queryTokens(q);
+  if (!tokens.length) return false;
+  // Todos os tokens no autor (CS Lewis ⊂ C S Lewis / C.S. Lewis)
+  if (tokens.every((t) => a.includes(t))) return true;
+  const compactA = a.replace(/\s+/g, "");
+  const compactQ = tokens.join("");
+  return compactA.includes(compactQ) || compactQ.includes(compactA);
+}
+
 export async function searchCatalogForAgent(opts: {
   tenantId: string;
   query?: string;
@@ -104,6 +148,8 @@ export async function searchCatalogForAgent(opts: {
   budgetMin?: number | null;
   budgetMax?: number | null;
   limit?: number;
+  /** Se true, só devolve hits com autor batendo no query (quando há autor). */
+  authorOnly?: boolean;
 }): Promise<CatalogHit[]> {
   const limit = opts.limit ?? 8;
   const conditions: SQL[] = [
@@ -112,6 +158,7 @@ export async function searchCatalogForAgent(opts: {
   ];
 
   const q = opts.query?.trim();
+  const tokens = q ? queryTokens(q) : [];
   let tagMatchedIds: string[] = [];
   if (q) {
     const like = `%${q}%`;
@@ -136,6 +183,11 @@ export async function searchCatalogForAgent(opts: {
       ilike(books.isbn, like),
       ilike(books.genre, like),
     ];
+    // "CS Lewis" também casa "C. S. Lewis" / "Lewis, C.S." via tokens
+    for (const tok of tokens.slice(0, 4)) {
+      parts.push(ilike(books.author, `%${tok}%`));
+      parts.push(ilike(books.title, `%${tok}%`));
+    }
     if (tagMatchedIds.length) parts.push(inArray(books.id, tagMatchedIds));
     conditions.push(or(...parts)!);
   } else if (opts.interestTags?.length) {
@@ -210,12 +262,19 @@ export async function searchCatalogForAgent(opts: {
     for (const t of bookTagsList) {
       if (interest.has(t.toLowerCase())) score += 3;
     }
+    const isAuthorHit = q ? authorMatchesQuery(r.author, q) : false;
     if (q) {
-      const ql = q.toLowerCase();
-      if (r.title.toLowerCase().includes(ql)) score += 5;
-      if (r.author?.toLowerCase().includes(ql)) score += 4;
+      const ql = normText(q);
+      const titleN = normText(r.title);
+      if (titleN.includes(ql)) score += 8;
+      if (isAuthorHit) score += 12;
+      for (const tok of tokens) {
+        if (titleN.includes(tok)) score += 2;
+        if (normText(r.author || "").includes(tok)) score += 3;
+      }
     }
     if (!q && interest.size === 0) score = 1;
+    if (opts.authorOnly && q && !isAuthorHit) continue;
     hits.push({
       id: r.id,
       title: r.title,
