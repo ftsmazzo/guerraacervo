@@ -2,8 +2,15 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { whatsappConnections } from "@/db/schema";
-import { resolveEvolutionConfig } from "@/lib/whatsapp/evolution";
+import {
+  ensureInstanceWebhook,
+  resolveEvolutionConfig,
+} from "@/lib/whatsapp/evolution";
 import { handleInboundMessage } from "@/lib/whatsapp/agent/router";
+import {
+  rememberLidPhone,
+  resolvePhoneFromLid,
+} from "@/lib/whatsapp/lid-map";
 import { getConnectionByInstance } from "@/lib/whatsapp/queries";
 
 export const runtime = "nodejs";
@@ -13,13 +20,21 @@ function eventName(body: Record<string, unknown>): string {
   return String(e).toLowerCase();
 }
 
-function unwrapMessage(msg: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
+function unwrapMessage(
+  msg: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
   if (!msg || typeof msg !== "object") return null;
-  const ephemeral = msg.ephemeralMessage as { message?: Record<string, unknown> } | undefined;
+  const ephemeral = msg.ephemeralMessage as
+    | { message?: Record<string, unknown> }
+    | undefined;
   if (ephemeral?.message) return unwrapMessage(ephemeral.message);
-  const viewOnce = msg.viewOnceMessage as { message?: Record<string, unknown> } | undefined;
+  const viewOnce = msg.viewOnceMessage as
+    | { message?: Record<string, unknown> }
+    | undefined;
   if (viewOnce?.message) return unwrapMessage(viewOnce.message);
-  const viewOnceV2 = msg.viewOnceMessageV2 as { message?: Record<string, unknown> } | undefined;
+  const viewOnceV2 = msg.viewOnceMessageV2 as
+    | { message?: Record<string, unknown> }
+    | undefined;
   if (viewOnceV2?.message) return unwrapMessage(viewOnceV2.message);
   return msg;
 }
@@ -31,21 +46,28 @@ function extractText(message: Record<string, unknown>): string {
   if (typeof msg.conversation === "string") return msg.conversation;
   const ext = msg.extendedTextMessage as { text?: string } | undefined;
   if (ext?.text) return ext.text;
-  const btn = msg.buttonsResponseMessage as { selectedDisplayText?: string } | undefined;
+  const btn = msg.buttonsResponseMessage as
+    | { selectedDisplayText?: string }
+    | undefined;
   if (btn?.selectedDisplayText) return btn.selectedDisplayText;
-  const list = msg.listResponseMessage as { title?: string; singleSelectReply?: { selectedRowId?: string } } | undefined;
+  const list = msg.listResponseMessage as
+    | { title?: string; singleSelectReply?: { selectedRowId?: string } }
+    | undefined;
   if (list?.title) return list.title;
   return "";
 }
 
 /** Prefer phone JID over WhatsApp LID (@lid). */
-function resolveRemoteJid(m: Record<string, unknown>): string {
+function resolveRemoteJidSync(m: Record<string, unknown>): {
+  jid: string;
+  lid?: string;
+  phoneAlt?: string;
+} {
   const key = (m.key || {}) as {
     remoteJid?: string;
     remoteJidAlt?: string;
     participant?: string;
     participantAlt?: string;
-    addressingMode?: string;
   };
   const candidates = [
     key.remoteJidAlt,
@@ -56,12 +78,16 @@ function resolveRemoteJid(m: Record<string, unknown>): string {
   ].filter(Boolean) as string[];
 
   const phoneJid = candidates.find((j) => j.includes("@s.whatsapp.net"));
-  if (phoneJid) return phoneJid;
+  const lidJid = candidates.find((j) => j.includes("@lid"));
+
+  if (phoneJid) {
+    return { jid: phoneJid, lid: lidJid, phoneAlt: phoneJid };
+  }
 
   const nonLid = candidates.find((j) => j && !j.includes("@lid"));
-  if (nonLid) return nonLid;
+  if (nonLid) return { jid: nonLid, lid: lidJid };
 
-  return candidates[0] || "";
+  return { jid: candidates[0] || "", lid: lidJid };
 }
 
 export async function POST(request: Request) {
@@ -122,6 +148,11 @@ export async function POST(request: Request) {
             updatedAt: new Date(),
           })
           .where(eq(whatsappConnections.id, conn.id));
+
+        // Definitivo: toda vez que abre (troca de chip / QR), reaplica webhook
+        if (status === "open") {
+          await ensureInstanceWebhook(cfg, instance);
+        }
       }
     }
 
@@ -144,7 +175,6 @@ export async function POST(request: Request) {
 
     if (evt.includes("messages.upsert") || evt.includes("messages_upsert")) {
       const data = (body.data || body) as Record<string, unknown>;
-      // Evolution may send data as message object or { key, message, ... }
       const messages = Array.isArray(data)
         ? data
         : Array.isArray(data.messages)
@@ -154,10 +184,24 @@ export async function POST(request: Request) {
       for (const m of messages) {
         const key = (m.key || {}) as {
           fromMe?: boolean;
-          remoteJid?: string;
         };
         if (key.fromMe) continue;
-        const remoteJid = resolveRemoteJid(m);
+
+        const resolved = resolveRemoteJidSync(m);
+        if (resolved.lid && resolved.phoneAlt) {
+          await rememberLidPhone(resolved.lid, resolved.phoneAlt);
+        }
+
+        let remoteJid = resolved.jid;
+        if (remoteJid.includes("@lid")) {
+          const mapped = await resolvePhoneFromLid(remoteJid);
+          if (mapped) {
+            remoteJid = mapped.includes("@")
+              ? mapped
+              : `${mapped}@s.whatsapp.net`;
+          }
+        }
+
         if (!remoteJid) continue;
         const text = extractText(m);
         if (!text.trim()) continue;
