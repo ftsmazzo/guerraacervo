@@ -154,7 +154,7 @@ export function extractQrBase64(payload: unknown): string | null {
 }
 
 export function normalizePhone(raw: string): string {
-  let d = raw.replace(/\D/g, "");
+  const d = raw.replace(/\D/g, "");
   if (d.startsWith("55") && d.length >= 12) return d;
   if (d.length >= 10 && d.length <= 11) return `55${d}`;
   return d;
