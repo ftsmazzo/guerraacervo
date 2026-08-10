@@ -24,7 +24,7 @@ import {
   normISBN,
 } from "@/lib/isbn/normalize";
 import { isPoorSynopsis, synopsisQuality } from "@/lib/isbn/quality-client";
-import { processarTags } from "@/lib/isbn/tags-pt";
+import { enrichBookTags } from "@/lib/isbn/tags-pt";
 import {
   fetchGoogle,
   fetchHathiTrust,
@@ -404,10 +404,19 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
         applyCover(keepCover, "photo");
       }
 
-      // Tags: só PT, e só se a IA trouxe poucas
-      if (base.tagsCount < 3) {
-        processarTags(merged.tags).forEach(addTag);
-      }
+      // Tags: sempre mescla catálogo + deriva da ficha
+      enrichBookTags(
+        [merged.tags],
+        {
+          genero: genre || merged.genero,
+          idioma: language || merged.idioma,
+          colecao: "",
+          tipoCapa: coverType || merged.tipoCapa || "",
+          ano: year || merged.ano,
+          titulo: title || merged.titulo,
+        },
+      ).forEach(addTag);
+
       setIsbnMsg(
         `ISBN ${isbnN} · enriquecido com: ${merged.fontes.join(" + ") || "fontes"} (sem sobrescrever a IA)`,
       );
@@ -439,7 +448,16 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     if (merged.paginas) setPages(String(merged.paginas));
     if (merged.peso && !weight) setWeight(String(merged.peso));
     if (merged.tipoCapa) setCoverType(merged.tipoCapa);
-    processarTags(merged.tags).forEach(addTag);
+    enrichBookTags(
+      [merged.tags],
+      {
+        genero: merged.genero,
+        idioma: merged.idioma,
+        tipoCapa: merged.tipoCapa,
+        ano: merged.ano,
+        titulo: merged.titulo,
+      },
+    ).forEach(addTag);
     setIsbnMsg(
       `Dados mesclados de: ${merged.fontes.join(" + ") || "fontes disponíveis"}`,
     );
@@ -515,12 +533,20 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
       setWeight(String(d.peso));
     }
 
-    const aiTags = processarTags([
-      ...(Array.isArray(d.tags) ? d.tags.map(String) : []),
-      ...(typeof d.colecao === "string" && d.colecao.trim()
-        ? [d.colecao.trim()]
-        : []),
-    ]);
+    const aiTags = enrichBookTags(
+      [Array.isArray(d.tags) ? d.tags.map(String) : []],
+      {
+        genero: String(d.genero || ""),
+        idioma: String(d.idioma || "Português"),
+        colecao: typeof d.colecao === "string" ? d.colecao : "",
+        tipoCapa:
+          d.tipoCapa === "Brochura" || d.tipoCapa === "Capa Dura"
+            ? d.tipoCapa
+            : "",
+        ano: String(d.ano || ""),
+        titulo: String(d.titulo || ""),
+      },
+    );
     aiTags.forEach(addTag);
 
     const catalogCover = pickWebCover(

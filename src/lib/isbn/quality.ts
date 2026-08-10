@@ -7,7 +7,7 @@ import {
   isPoorSynopsis,
   synopsisQuality,
 } from "@/lib/isbn/quality-client";
-import { processarTags } from "@/lib/isbn/tags-pt";
+import { enrichBookTags, processarTags } from "@/lib/isbn/tags-pt";
 
 export { isPoorSynopsis, synopsisQuality } from "@/lib/isbn/quality-client";
 
@@ -420,7 +420,10 @@ function mergeSnippets(all: CatalogSnippet[]): EnrichmentBundle {
     bestAno: all.map((s) => s.ano).find((a) => /^\d{4}$/.test(a)) || "",
     bestEditora:
       all.map((s) => s.editora).find((e) => e && e.length > 2) || "",
-    bestTags: processarTags(all.flatMap((s) => s.tags)).slice(0, 10),
+    bestTags: processarTags(all.flatMap((s) => s.tags), { max: 18 }).slice(
+      0,
+      16,
+    ),
     fontes: [...new Set(all.slice(0, 6).map((s) => s.fonte))],
     stage: "",
   };
@@ -544,6 +547,8 @@ export function applyBestEnrichment<
     capa: string;
     tags: string[];
     avisos: string[];
+    titulo?: string;
+    tipoCapa?: string | null;
   },
 >(result: T, enrich: EnrichmentBundle) {
   let upgraded = 0;
@@ -597,9 +602,21 @@ export function applyBestEnrichment<
     upgraded++;
   }
 
-  if (result.tags.length < 3 && enrich.bestTags.length) {
-    result.tags = processarTags([...result.tags, ...enrich.bestTags]);
-    upgraded++;
+  // Tags: sempre mescla catálogo + deriva da ficha (meta ~8–18)
+  if (enrich.bestTags.length || result.tags.length) {
+    const before = result.tags.length;
+    result.tags = enrichBookTags(
+      [result.tags, enrich.bestTags],
+      {
+        genero: result.genero,
+        idioma: result.idioma,
+        tipoCapa: result.tipoCapa,
+        ano: result.ano,
+        titulo: result.titulo,
+      },
+      18,
+    );
+    if (result.tags.length > before) upgraded++;
   }
 
   if (upgraded > 0 && enrich.fontes.length) {

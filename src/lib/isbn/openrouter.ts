@@ -52,7 +52,8 @@ export const BOOK_JSON_SCHEMA = {
       tags: {
         type: "array",
         items: { type: "string" },
-        description: "Tags curtas em português",
+        description:
+          "6 a 12 tags curtas em português para sebo: gênero, público (infantil/jovem adulto/adulto), temas, época, formato se couber (ex: ficção, distopia, jovem adulto, clássico)",
       },
       confianca: {
         type: "number",

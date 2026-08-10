@@ -25,6 +25,7 @@ import {
   fetchBestCatalogEnrichment,
   isEnrichmentSatisfied,
 } from "@/lib/isbn/quality";
+import { enrichBookTags } from "@/lib/isbn/tags-pt";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -90,12 +91,18 @@ function toResult(partial: AiBookPartial, src: string): AiResult {
       : null;
   const capaRaw = String(partial.capa || "").trim();
   const colecao = String(partial.colecao || "").trim();
-  const tags = Array.isArray(partial.tags)
-    ? partial.tags.map(String).filter(Boolean).slice(0, 12)
+  const rawTags = Array.isArray(partial.tags)
+    ? partial.tags.map(String).filter(Boolean)
     : [];
-  if (colecao && !tags.some((t) => t.toLowerCase() === colecao.toLowerCase())) {
-    tags.unshift(colecao);
-  }
+  if (colecao) rawTags.unshift(colecao);
+  const tags = enrichBookTags([rawTags], {
+    genero: String(partial.genero || ""),
+    idioma: String(partial.idioma || ""),
+    colecao,
+    tipoCapa: tipo || "",
+    ano: String(partial.ano || ""),
+    titulo: String(partial.titulo || ""),
+  });
   return {
     ...base,
     titulo: String(partial.titulo || ""),
@@ -139,6 +146,7 @@ Regras CRÍTICAS:
 - peso: só se a fonte informar em gramas/kg; senão null (o sistema estima).
 - Prefira ISBN-13 brasileiro (97885…).
 - Sinopse em português, completa (mín. 2–3 frases). Páginas se souber.
+- Tags: 6 a 12 etiquetas CURTAS em português, úteis para filtrar no sebo. Cubra gênero literário, público (infantil / jovem adulto / adulto), temas, época/contexto e formato se fizer sentido (ex.: ficção, distopia, jovem adulto, clássico, brasileiro). Evite inglês e frases longas.
 - Se a web trouxer pouca coisa, ainda assim preencha título/autor/editora com o que a capa mostra.`;
 
 async function enrichIsbnAndWeight(
