@@ -148,12 +148,14 @@ function nonempty(d: PartialBook): PartialBook | null {
 }
 
 async function srcGoogleBooks(isbn13: string, isbn10: string | null) {
+  const key = process.env.GOOGLE_BOOKS_API_KEY?.trim();
+  const keyQ = key ? `&key=${encodeURIComponent(key)}` : "";
   const urls = [
-    `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn13}&maxResults=1`,
+    `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn13}&maxResults=1${keyQ}`,
     isbn10
-      ? `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn10}&maxResults=1`
+      ? `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn10}&maxResults=1${keyQ}`
       : "",
-    `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(isbn13)}&maxResults=1&langRestrict=pt`,
+    `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(isbn13)}&maxResults=1&langRestrict=pt${keyQ}`,
   ].filter(Boolean);
 
   for (const url of urls) {

@@ -225,7 +225,7 @@ export async function openRouterChat(opts: {
   const structured = opts.structured !== false;
   const body: Record<string, unknown> = {
     model: opts.model,
-    temperature: opts.temperature ?? 0.15,
+    temperature: opts.temperature ?? 0,
     messages: opts.messages,
     plugins: buildOpenRouterPlugins(opts.webSearch, opts.webOpts),
   };

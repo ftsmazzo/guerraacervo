@@ -11,6 +11,7 @@ import {
   looksLikeIsbnQuery,
   normISBN,
 } from "@/lib/isbn/normalize";
+import { isPoorSynopsis, synopsisQuality } from "@/lib/isbn/quality";
 import { processarTags } from "@/lib/isbn/tags-pt";
 import {
   fetchGoogle,
@@ -294,30 +295,33 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
       if (!base.author.trim() && merged.autor) setAuthor(merged.autor);
       if (!base.publisher.trim() && merged.editora) setPublisher(merged.editora);
       if (!base.year.trim() && merged.ano) setYear(merged.ano);
+
+      // Sinopse: troca se a atual for pobre e a do catálogo for melhor (PT)
       if (
-        (!base.synopsis.trim() ||
-          (looksLikeEnglish(base.synopsis) &&
-            merged.sinopse &&
-            !looksLikeEnglish(merged.sinopse))) &&
         merged.sinopse &&
-        !looksLikeEnglish(merged.sinopse)
+        !looksLikeEnglish(merged.sinopse) &&
+        (isPoorSynopsis(base.synopsis) ||
+          synopsisQuality(merged.sinopse) > synopsisQuality(base.synopsis) + 8)
       ) {
-        if (!base.synopsis.trim()) setSynopsis(merged.sinopse);
-      } else if (!base.synopsis.trim() && merged.sinopse && !looksLikeEnglish(merged.sinopse)) {
         setSynopsis(merged.sinopse);
       }
-      if (!base.genre.trim() && merged.genero && !looksLikeEnglish(merged.genero)) {
+
+      if (
+        (!base.genre.trim() || looksLikeEnglish(base.genre)) &&
+        merged.genero &&
+        !looksLikeEnglish(merged.genero)
+      ) {
         setGenre(merged.genero);
       }
-      if (
-        !base.language.trim() ||
-        (/english|inglês/i.test(merged.idioma) &&
-          /portug/i.test(base.language))
-      ) {
-        // mantém português da IA
-      } else if (!base.language.trim() && merged.idioma) {
-        setLanguage(merged.idioma);
+
+      if (!base.language.trim() || /english|inglês/i.test(base.language)) {
+        if (merged.idioma && /portug/i.test(merged.idioma)) {
+          setLanguage(merged.idioma);
+        } else if (!base.language.trim() && merged.idioma) {
+          setLanguage(merged.idioma);
+        }
       }
+
       if (!base.pages.trim() && merged.paginas) setPages(String(merged.paginas));
       if (!base.weight.trim() && merged.peso) setWeight(String(merged.peso));
       if (merged.tipoCapa) setCoverType(merged.tipoCapa);

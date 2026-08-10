@@ -20,6 +20,11 @@ import {
   resolveIsbnByMetadata,
   verifyIsbnExists,
 } from "@/lib/isbn/verify";
+import {
+  applyBestEnrichment,
+  fetchBestCatalogEnrichment,
+  isPoorSynopsis,
+} from "@/lib/isbn/quality";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -132,7 +137,9 @@ Regras CRÍTICAS:
 - Se houver várias edições (ex. 9788526283299 vs 9788526231332), escolha a que bater com a capa/coleção visível; senão isbn="".
 - NUNCA invente URL de capa. capa="" se não tiver URL real de imagem.
 - peso: só se a fonte informar em gramas/kg; senão null (o sistema estima).
-- Prefira ISBN-13 brasileiro (97885…).`;
+- Prefira ISBN-13 brasileiro (97885…).
+- Sinopse em português, completa (mín. 2–3 frases). Páginas se souber.
+- Se a web trouxer pouca coisa, ainda assim preencha título/autor/editora com o que a capa mostra.`;
 
 async function enrichIsbnAndWeight(
   result: AiResult,
@@ -332,6 +339,36 @@ Consultas sugeridas:
       result.avisos.push(`Peso estimado ~${est}g (páginas/tipo de capa).`);
     }
   }
+
+  // 6) Sempre cruzar catálogos e ficar com o MELHOR de cada campo
+  // (mata a instabilidade: IA identifica; fontes ricas completam)
+  try {
+    const enrich = await fetchBestCatalogEnrichment({
+      titulo: result.titulo,
+      autor: result.autor,
+      editora: result.editora,
+      isbn13: result.isbnConfirmado ? result.isbn : undefined,
+    });
+    const n = applyBestEnrichment(result, enrich);
+    if (
+      n === 0 &&
+      (isPoorSynopsis(result.sinopse) || !result.paginas)
+    ) {
+      result.avisos.push(
+        "Catálogos sem sinopse/páginas fortes para esta edição — confira manualmente.",
+      );
+    }
+    // Recalcula peso se páginas chegaram agora
+    if ((!result.peso || result.pesoEstimado) && result.paginas) {
+      const est = estimateWeightGrams(result.paginas, result.tipoCapa);
+      if (est && (!result.peso || result.pesoEstimado)) {
+        result.peso = est;
+        result.pesoEstimado = true;
+      }
+    }
+  } catch {
+    result.avisos.push("Enriquecimento de catálogo indisponível nesta tentativa.");
+  }
 }
 
 export async function POST(request: Request) {
@@ -396,6 +433,7 @@ Tarefa: preencher ficha a partir da descrição (+ web).`;
       model: cfg.model,
       fallbacks: cfg.fallbacks,
       webSearch,
+      temperature: 0,
       messages: [
         { role: "system", content: system },
         { role: "user", content: userContent },
