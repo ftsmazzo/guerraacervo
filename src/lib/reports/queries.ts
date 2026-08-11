@@ -339,6 +339,13 @@ export type ClientRankingRow = {
 
 export type ClientRankingSort = "spent" | "orders" | "recency";
 
+function asDate(v: unknown): Date | null {
+  if (v == null) return null;
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v;
+  const d = new Date(String(v));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 /** Ranking de clientes no período (só pedidos debitáveis). */
 export async function rankClients(
   tenantId: string,
@@ -347,38 +354,12 @@ export async function rankClients(
   sort: ClientRankingSort = "spent",
   limit = 20,
 ): Promise<ClientRankingRow[]> {
-  const perOrder = db
-    .select({
-      clientId: orders.clientId,
-      orderId: orders.id,
-      totalAmount: orders.totalAmount,
-      orderDate: orders.orderDate,
-      books: sql<number>`COALESCE(SUM(${orderItems.quantity}), 0)::int`.as(
-        "books",
-      ),
-    })
-    .from(orders)
-    .leftJoin(orderItems, eq(orderItems.orderId, orders.id))
-    .where(
-      and(
-        periodFilter(tenantId, dataIni, dataFim),
-        inArray(orders.status, [...DEBIT_STATUSES]),
-      ),
-    )
-    .groupBy(
-      orders.clientId,
-      orders.id,
-      orders.totalAmount,
-      orders.orderDate,
-    )
-    .as("per_order");
-
-  const orderExpr =
+  const orderByExpr =
     sort === "orders"
-      ? sql`COUNT(*) DESC`
+      ? desc(sql`COUNT(${orders.id})`)
       : sort === "recency"
-        ? sql`MAX(${perOrder.orderDate}) DESC NULLS LAST`
-        : sql`COALESCE(SUM(${perOrder.totalAmount}), 0) DESC`;
+        ? desc(sql`MAX(${orders.orderDate})`)
+        : desc(sql`COALESCE(SUM(${orders.totalAmount}), 0)`);
 
   const rows = await db
     .select({
@@ -387,14 +368,29 @@ export async function rankClients(
       whatsapp: clients.whatsapp,
       email: clients.email,
       city: clients.city,
-      orders: sql<number>`COUNT(*)::int`,
-      spent: sql<string>`COALESCE(SUM(${perOrder.totalAmount}), 0)`,
-      books: sql<number>`COALESCE(SUM(${perOrder.books}), 0)::int`,
-      lastOrderAt: sql<Date | null>`MAX(${perOrder.orderDate})`,
+      orders: sql<number>`COUNT(${orders.id})::int`,
+      spent: sql<string>`COALESCE(SUM(${orders.totalAmount}), 0)`,
+      books: sql<number>`COALESCE((
+        SELECT SUM(oi.quantity)::int
+        FROM order_items oi
+        INNER JOIN orders ox ON ox.id = oi.order_id
+        WHERE ox.client_id = ${clients.id}
+          AND ox.tenant_id = ${tenantId}
+          AND ox.status IN ('Pago', 'Enviado', 'Entregue')
+          AND ox.order_date >= ${startOfDay(dataIni)}
+          AND ox.order_date <= ${endOfDay(dataFim)}
+      ), 0)`,
+      lastOrderAt: sql<string | Date | null>`MAX(${orders.orderDate})`,
     })
     .from(clients)
-    .innerJoin(perOrder, eq(perOrder.clientId, clients.id))
-    .where(eq(clients.tenantId, tenantId))
+    .innerJoin(orders, eq(orders.clientId, clients.id))
+    .where(
+      and(
+        eq(clients.tenantId, tenantId),
+        periodFilter(tenantId, dataIni, dataFim),
+        inArray(orders.status, [...DEBIT_STATUSES]),
+      ),
+    )
     .groupBy(
       clients.id,
       clients.name,
@@ -402,7 +398,7 @@ export async function rankClients(
       clients.email,
       clients.city,
     )
-    .orderBy(orderExpr)
+    .orderBy(orderByExpr)
     .limit(limit);
 
   return rows.map((r) => ({
@@ -414,7 +410,7 @@ export async function rankClients(
     orders: Number(r.orders ?? 0),
     spent: Number(r.spent ?? 0),
     books: Number(r.books ?? 0),
-    lastOrderAt: r.lastOrderAt,
+    lastOrderAt: asDate(r.lastOrderAt),
   }));
 }
 

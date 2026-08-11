@@ -25,6 +25,13 @@ function shortDay(iso: string) {
   return `${d}/${m}`;
 }
 
+function fmtDate(v: Date | string | null | undefined) {
+  if (!v) return "—";
+  const d = v instanceof Date ? v : new Date(v);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("pt-BR");
+}
+
 function statusPill(status: string) {
   const map: Record<string, { bg: string; color: string }> = {
     "Aguardando Pagamento": { bg: "#fef3c7", color: "#92400e" },
@@ -213,9 +220,15 @@ async function ReportBody({
         ? dailyRevenueSeries(tenantId, dataIni, dataFim)
         : Promise.resolve([]),
       listStockReport(tenantId),
-      rankClients(tenantId, dataIni, dataFim, "spent", advanced ? 15 : 10),
-      rankClients(tenantId, dataIni, dataFim, "orders", advanced ? 15 : 10),
-      rankClients(tenantId, dataIni, dataFim, "recency", advanced ? 15 : 10),
+      rankClients(tenantId, dataIni, dataFim, "spent", advanced ? 15 : 10).catch(
+        () => [],
+      ),
+      rankClients(tenantId, dataIni, dataFim, "orders", advanced ? 15 : 10).catch(
+        () => [],
+      ),
+      rankClients(tenantId, dataIni, dataFim, "recency", advanced ? 15 : 10).catch(
+        () => [],
+      ),
     ]);
 
   const maxDaily = Math.max(1, ...daily.map((d) => d.total));
@@ -512,9 +525,7 @@ async function ReportBody({
                       ) : null}
                     </td>
                     <td>
-                      {c.lastOrderAt
-                        ? c.lastOrderAt.toLocaleDateString("pt-BR")
-                        : "—"}
+                      {fmtDate(c.lastOrderAt)}
                     </td>
                     <td className="num">{c.orders}</td>
                     <td className="num">{money(c.spent)}</td>
