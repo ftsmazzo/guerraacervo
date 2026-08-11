@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter, Manrope } from "next/font/google";
 import "./globals.css";
 
@@ -21,6 +21,20 @@ export const metadata: Metadata = {
   title: "GuerraAcervo",
   description:
     "Sistema para sebos: catálogo, WhatsApp e vendas — planos Negócio com trial de 14 dias.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "GuerraAcervo",
+    statusBarStyle: "default",
+  },
+  icons: {
+    icon: "/guerraacervo-icon.png",
+    apple: "/guerraacervo-icon.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#e67e22",
 };
 
 export default function RootLayout({

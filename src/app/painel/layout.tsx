@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
 import { ManageSubscriptionButton } from "@/components/manage-subscription-button";
+import { PushEnableButton } from "@/components/push-enable-button";
 import { ReservationAlertsBanner } from "@/components/reservation-alerts-banner";
 import {
   getAuthContext,
@@ -121,6 +122,7 @@ export default async function PainelLayout({
             </p>
           </div>
           <div className="flex items-center gap-4">
+            {ctx.tenant ? <PushEnableButton /> : null}
             {ctx.tenant ? <ManageSubscriptionButton /> : null}
             <span className="hidden text-xs text-muted sm:inline">
               {ctx.user.email}

@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { getAuthContext, hasEntitlement } from "@/lib/auth/context";
+import { getReservationNotifyWhatsapp } from "@/lib/loja/settings";
 import { resolveEvolutionConfig } from "@/lib/whatsapp/evolution";
 import { getWhatsappConnection } from "@/lib/whatsapp/queries";
+import { ReservationNotifyForm } from "./reservation-notify-form";
 import { WhatsappPanel } from "./whatsapp-panel";
 
 export default async function LojaPage() {
@@ -20,27 +22,36 @@ export default async function LojaPage() {
 
   const configured = Boolean(resolveEvolutionConfig());
   const conn = await getWhatsappConnection(ctx.tenant.id);
+  const notifyPhone = await getReservationNotifyWhatsapp();
 
   return (
     <div>
       <h1 className="text-2xl font-semibold text-ink">Loja</h1>
       <p className="mt-1 max-w-xl text-sm text-muted">
-        Canal WhatsApp do sebo — conexão, perfil de clientes e avisos de
-        novidades. A vitrine pública entra no próximo ciclo.
+        Canal WhatsApp do sebo — conexão, alertas de reserva e avisos de
+        novidades.
       </p>
-      <div className="mt-6">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
-          WhatsApp
-        </h2>
-        <WhatsappPanel
-          configured={configured}
-          initial={{
-            status: conn?.status ?? "disconnected",
-            phone: conn?.phone ?? null,
-            qr: conn?.lastQr ?? null,
-            instanceName: conn?.instanceName ?? null,
-          }}
-        />
+      <div className="mt-6 space-y-8">
+        <div>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
+            WhatsApp do sebo
+          </h2>
+          <WhatsappPanel
+            configured={configured}
+            initial={{
+              status: conn?.status ?? "disconnected",
+              phone: conn?.phone ?? null,
+              qr: conn?.lastQr ?? null,
+              instanceName: conn?.instanceName ?? null,
+            }}
+          />
+        </div>
+        <div>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
+            Alertas
+          </h2>
+          <ReservationNotifyForm initialPhone={notifyPhone} />
+        </div>
       </div>
     </div>
   );

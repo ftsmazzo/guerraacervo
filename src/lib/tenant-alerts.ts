@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { memberships, tenants, users } from "@/db/schema";
 import { getRedis } from "@/lib/redis";
+import { sendPushToTenant } from "@/lib/push/send";
 import { appPublicUrl } from "@/lib/stripe/client";
 import {
   normalizePhone,
@@ -141,7 +142,7 @@ async function resolveSeboNotifyPhones(tenantId: string): Promise<string[]> {
   return [...phones];
 }
 
-/** Avisa o sebo: WhatsApp do dono + alerta no painel. */
+/** Avisa o sebo: banner painel + WhatsApp + Web Push. */
 export async function notifySeboReservation(opts: {
   tenantId: string;
   orderId: string;
@@ -158,6 +159,14 @@ export async function notifySeboReservation(opts: {
     source,
   });
 
+  const link = `${appPublicUrl()}/painel/pedidos/${opts.orderId}`;
+
+  void sendPushToTenant(opts.tenantId, {
+    title: "Nova reserva — tire da prateleira",
+    body: `${opts.bookTitle} · ${opts.clientName}`,
+    url: link,
+  }).catch((e) => console.warn("[alerts] push", e));
+
   const cfg = resolveEvolutionConfig();
   const conn = await getWhatsappConnection(opts.tenantId);
   if (!cfg || !conn || conn.status !== "open") return;
@@ -165,13 +174,12 @@ export async function notifySeboReservation(opts: {
   const phones = await resolveSeboNotifyPhones(opts.tenantId);
   if (!phones.length) {
     console.info(
-      "[alerts] reserva sem WhatsApp do dono — só banner no painel",
+      "[alerts] reserva sem WhatsApp de alerta — banner/push ok",
       opts.orderId,
     );
     return;
   }
 
-  const link = `${appPublicUrl()}/painel/pedidos/${opts.orderId}`;
   const text = [
     `*Nova reserva* — tire o livro da prateleira`,
     `*${opts.bookTitle}*`,
