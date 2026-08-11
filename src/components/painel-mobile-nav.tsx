@@ -16,6 +16,11 @@ const items = [
     match: (p: string) => p.startsWith("/painel/livros"),
   },
   {
+    href: "/painel/relatorios",
+    label: "Relatórios",
+    match: (p: string) => p.startsWith("/painel/relatorios"),
+  },
+  {
     href: "/painel/loja#app-celular",
     label: "Loja",
     match: (p: string) => p.startsWith("/painel/loja"),
@@ -31,19 +36,19 @@ export function PainelMobileNav() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Navegação mobile"
     >
-      <ul className="mx-auto grid max-w-lg grid-cols-4">
+      <ul className="mx-auto grid max-w-lg grid-cols-5">
         {items.map((item) => {
           const active = item.match(pathname);
           return (
             <li key={item.href}>
               <Link
                 href={item.href}
-                className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[0.7rem] font-medium ${
+                className={`flex min-h-14 flex-col items-center justify-center gap-0.5 px-0.5 text-center text-[0.65rem] font-medium leading-tight ${
                   active ? "text-accent-text" : "text-muted"
                 }`}
               >
                 <span
-                  className={`h-1 w-6 rounded-full ${
+                  className={`h-1 w-5 rounded-full ${
                     active ? "bg-accent" : "bg-transparent"
                   }`}
                   aria-hidden
