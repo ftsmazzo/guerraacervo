@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
 import { ManageSubscriptionButton } from "@/components/manage-subscription-button";
-import { PushEnableButton } from "@/components/push-enable-button";
+import { PainelMobileNav } from "@/components/painel-mobile-nav";
+import { PushAlertsCard } from "@/components/push-enable-button";
 import { ReservationAlertsBanner } from "@/components/reservation-alerts-banner";
 import {
   getAuthContext,
@@ -68,13 +69,11 @@ export default async function PainelLayout({
   const trial = ctx.tenant
     ? trialLabel(ctx.tenant.trialEndsAt, ctx.tenant.status)
     : null;
-  const alerts = ctx.tenant
-    ? await listTenantAlerts(ctx.tenant.id, 5)
-    : [];
+  const alerts = ctx.tenant ? await listTenantAlerts(ctx.tenant.id, 5) : [];
 
   return (
     <div className="min-h-screen md:grid md:grid-cols-[230px_1fr]">
-      <aside className="border-b border-line bg-sidebar-bg md:border-b-0 md:border-r md:border-line">
+      <aside className="hidden border-r border-line bg-sidebar-bg md:block">
         <div className="flex h-[58px] items-center gap-2.5 border-b border-line px-3.5">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[7px] bg-accent text-sm font-semibold text-white">
             G
@@ -86,7 +85,7 @@ export default async function PainelLayout({
             <p className="truncate text-[0.62rem] text-muted">Painel do sebo</p>
           </div>
         </div>
-        <nav className="flex gap-1 overflow-x-auto px-2 py-2 md:flex-col">
+        <nav className="flex flex-col gap-1 px-2 py-2">
           {nav
             .filter((item) => allowed(planCode, item.entitlement))
             .map((item) => (
@@ -99,7 +98,7 @@ export default async function PainelLayout({
               </Link>
             ))}
         </nav>
-        <div className="hidden border-t border-line px-5 py-4 md:block">
+        <div className="border-t border-line px-5 py-4">
           {ctx.user.isPlatformAdmin ? (
             <Link
               href="/admin"
@@ -110,31 +109,43 @@ export default async function PainelLayout({
           ) : null}
         </div>
       </aside>
-      <div className="bg-background">
-        <header className="flex h-[58px] items-center justify-between border-b border-line bg-card px-6">
-          <div>
-            <p className="text-sm font-medium text-ink">
-              {ctx.tenant?.name ?? "Sem tenant"}
-            </p>
-            <p className="text-xs text-muted">
-              Plano: {ctx.tenant?.planName ?? "—"}
-              {trial ? ` · trial · ${trial}` : null}
-            </p>
+
+      <div className="bg-background pb-20 md:pb-0">
+        <header className="sticky top-0 z-30 border-b border-line bg-card/95 backdrop-blur">
+          <div className="flex min-h-[52px] items-center justify-between gap-3 px-4 py-2 md:h-[58px] md:px-6">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-ink">
+                {ctx.tenant?.name ?? "Sem tenant"}
+              </p>
+              <p className="truncate text-xs text-muted">
+                <span className="md:hidden">Reservas · </span>
+                Plano: {ctx.tenant?.planName ?? "—"}
+                {trial ? ` · trial · ${trial}` : null}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-3">
+              <span className="hidden text-xs text-muted lg:inline">
+                {ctx.user.email}
+              </span>
+              <div className="hidden sm:block">
+                {ctx.tenant ? <ManageSubscriptionButton /> : null}
+              </div>
+              <LogoutButton className="text-sm text-muted hover:text-ink" />
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            {ctx.tenant ? <PushEnableButton /> : null}
-            {ctx.tenant ? <ManageSubscriptionButton /> : null}
-            <span className="hidden text-xs text-muted sm:inline">
-              {ctx.user.email}
-            </span>
-            <LogoutButton className="text-sm text-muted hover:text-ink" />
-          </div>
+          {ctx.tenant && access.ok ? (
+            <div className="border-t border-line px-4 py-2 md:hidden">
+              <PushAlertsCard variant="compact" />
+            </div>
+          ) : null}
         </header>
+
         {trial && access.ok ? (
-          <div className="border-b border-line bg-accent-soft px-6 py-3 text-sm text-accent-text">
+          <div className="border-b border-line bg-accent-soft px-4 py-2.5 text-sm text-accent-text md:px-6 md:py-3">
             Período de teste: {trial}.{" "}
             <span className="text-muted">
-              Use &quot;Gerenciar assinatura&quot; para cartão ou cancelamento.
+              Use &quot;Gerenciar assinatura&quot; no PC para cartão ou
+              cancelamento.
             </span>
           </div>
         ) : null}
@@ -142,13 +153,10 @@ export default async function PainelLayout({
           <ReservationAlertsBanner alerts={alerts} />
         ) : null}
         {!access.ok ? (
-          <div className="px-6 py-10">
+          <div className="px-4 py-10 md:px-6">
             <div className="max-w-lg rounded-lg border border-line bg-card p-6">
               <h2 className="text-lg font-semibold text-ink">Acesso bloqueado</h2>
               <p className="mt-2 text-sm text-muted">{access.reason}</p>
-              <p className="mt-2 text-sm text-muted">
-                Atualize o pagamento no portal Stripe ou inicie um novo cadastro.
-              </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <ManageSubscriptionButton />
                 <Link
@@ -161,9 +169,11 @@ export default async function PainelLayout({
             </div>
           </div>
         ) : (
-          <div className="px-6 py-6">{children}</div>
+          <div className="px-4 py-4 md:px-6 md:py-6">{children}</div>
         )}
       </div>
+
+      <PainelMobileNav />
     </div>
   );
 }

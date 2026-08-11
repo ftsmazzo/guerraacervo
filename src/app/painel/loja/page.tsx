@@ -5,6 +5,7 @@ import { resolveEvolutionConfig } from "@/lib/whatsapp/evolution";
 import { getWhatsappConnection } from "@/lib/whatsapp/queries";
 import { ReservationNotifyForm } from "./reservation-notify-form";
 import { WhatsappPanel } from "./whatsapp-panel";
+import { PushAlertsCard } from "@/components/push-enable-button";
 
 export default async function LojaPage() {
   const ctx = await getAuthContext();
@@ -50,7 +51,10 @@ export default async function LojaPage() {
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
             Alertas
           </h2>
-          <ReservationNotifyForm initialPhone={notifyPhone} />
+          <div className="space-y-4">
+            <PushAlertsCard />
+            <ReservationNotifyForm initialPhone={notifyPhone} />
+          </div>
         </div>
       </div>
     </div>

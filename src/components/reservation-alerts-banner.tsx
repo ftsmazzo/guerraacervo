@@ -34,9 +34,9 @@ export function ReservationAlertsBanner({
       {visible.map((a) => (
         <div
           key={a.id}
-          className="flex flex-wrap items-center justify-between gap-2 px-6 py-2.5 text-sm text-accent-text"
+          className="flex flex-col gap-2 border-b border-line/60 px-4 py-3 text-sm text-accent-text last:border-b-0 md:flex-row md:flex-wrap md:items-center md:justify-between md:px-6 md:py-2.5"
         >
-          <p>
+          <p className="leading-snug">
             <span className="font-semibold">Nova reserva</span>
             {" — "}
             tire <span className="font-medium">{a.bookTitle}</span> da
@@ -46,7 +46,7 @@ export function ReservationAlertsBanner({
           <div className="flex items-center gap-3">
             <Link
               href={`/painel/pedidos/${a.orderId}`}
-              className="font-medium underline"
+              className="inline-flex min-h-10 flex-1 items-center justify-center rounded-md bg-accent px-3 py-2 text-sm font-medium text-white md:min-h-0 md:flex-none md:bg-transparent md:px-0 md:py-0 md:text-accent-text md:underline"
             >
               Abrir pedido
             </Link>
@@ -54,7 +54,7 @@ export function ReservationAlertsBanner({
               type="button"
               disabled={pending}
               onClick={() => dismiss(a.id)}
-              className="text-xs text-muted hover:text-ink disabled:opacity-50"
+              className="min-h-10 px-2 text-xs text-muted hover:text-ink disabled:opacity-50"
             >
               Dispensar
             </button>
