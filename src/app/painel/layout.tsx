@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
+import { ManageSubscriptionButton } from "@/components/manage-subscription-button";
 import {
   getAuthContext,
   hasEntitlement,
@@ -115,18 +116,43 @@ export default async function PainelLayout({
             </p>
           </div>
           <div className="flex items-center gap-4">
+            {ctx.tenant ? <ManageSubscriptionButton /> : null}
             <span className="hidden text-xs text-muted sm:inline">
               {ctx.user.email}
             </span>
             <LogoutButton className="text-sm text-muted hover:text-ink" />
           </div>
         </header>
-        {!access.ok ? (
+        {trial && access.ok ? (
           <div className="border-b border-line bg-accent-soft px-6 py-3 text-sm text-accent-text">
-            {access.reason} Assine um plano para continuar.
+            Período de teste: {trial}.{" "}
+            <span className="text-muted">
+              Use &quot;Gerenciar assinatura&quot; para cartão ou cancelamento.
+            </span>
           </div>
         ) : null}
-        <div className="px-6 py-6">{children}</div>
+        {!access.ok ? (
+          <div className="px-6 py-10">
+            <div className="max-w-lg rounded-lg border border-line bg-card p-6">
+              <h2 className="text-lg font-semibold text-ink">Acesso bloqueado</h2>
+              <p className="mt-2 text-sm text-muted">{access.reason}</p>
+              <p className="mt-2 text-sm text-muted">
+                Atualize o pagamento no portal Stripe ou inicie um novo cadastro.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <ManageSubscriptionButton />
+                <Link
+                  href="/cadastro"
+                  className="text-sm text-accent-text underline"
+                >
+                  Novo cadastro
+                </Link>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="px-6 py-6">{children}</div>
+        )}
       </div>
     </div>
   );

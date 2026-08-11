@@ -16,6 +16,12 @@ export default function LoginPage() {
         <Suspense fallback={<p className="mt-6 text-sm text-muted">Carregando…</p>}>
           <LoginForm />
         </Suspense>
+        <p className="mt-6 text-center text-sm text-muted">
+          Sem conta?{" "}
+          <Link href="/cadastro" className="text-accent-text underline">
+            Começar teste
+          </Link>
+        </p>
       </div>
     </main>
   );

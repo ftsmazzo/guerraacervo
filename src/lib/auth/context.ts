@@ -40,14 +40,24 @@ export function tenantAccessOk(tenant: {
   status: string;
   trialEndsAt: Date | null;
 }): { ok: boolean; reason?: string } {
-  if (tenant.status === "suspended" || tenant.status === "canceled") {
-    return { ok: false, reason: "Conta suspensa ou cancelada." };
+  if (tenant.status === "suspended") {
+    return { ok: false, reason: "Conta suspensa." };
+  }
+  if (tenant.status === "canceled") {
+    return { ok: false, reason: "Assinatura cancelada." };
   }
   if (tenant.status === "past_due") {
     return { ok: false, reason: "Pagamento em atraso." };
   }
   if (tenant.status === "trialing" && !isTrialActive(tenant)) {
     return { ok: false, reason: "Período de teste encerrado." };
+  }
+  if (
+    tenant.status !== "trialing" &&
+    tenant.status !== "active" &&
+    tenant.status !== "past_due"
+  ) {
+    return { ok: false, reason: "Status da conta inválido." };
   }
   return { ok: true };
 }

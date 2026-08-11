@@ -86,6 +86,10 @@ export const users = pgTable(
     name: varchar("name", { length: 160 }).notNull(),
     passwordHash: text("password_hash").notNull(),
     isPlatformAdmin: boolean("is_platform_admin").notNull().default(false),
+    whatsapp: varchar("whatsapp", { length: 30 }),
+    whatsappVerifiedAt: timestamp("whatsapp_verified_at", {
+      withTimezone: true,
+    }),
     ...timestamps,
   },
   (t) => [uniqueIndex("users_email_uidx").on(t.email)],

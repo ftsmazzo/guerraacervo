@@ -32,10 +32,10 @@ export default function HomePage() {
               Entrar
             </Link>
             <Link
-              href="/painel"
+              href="/cadastro"
               className="rounded-md bg-accent px-3 py-1.5 font-medium text-white hover:bg-accent-dark"
             >
-              Painel
+              Começar teste
             </Link>
           </nav>
         </div>
@@ -52,22 +52,16 @@ export default function HomePage() {
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
-            href="/painel"
+            href="/cadastro"
             className="rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-dark"
           >
-            Abrir painel
+            Começar teste grátis
           </Link>
           <Link
-            href="/admin"
+            href="/login"
             className="rounded-md border border-line bg-card px-4 py-2.5 text-sm font-medium"
           >
-            Admin plataforma
-          </Link>
-          <Link
-            href="/api/health"
-            className="rounded-md border border-line bg-card px-4 py-2.5 text-sm font-medium"
-          >
-            Health check
+            Já tenho conta
           </Link>
         </div>
       </section>
@@ -76,8 +70,8 @@ export default function HomePage() {
         <div className="mx-auto max-w-5xl px-6 py-12">
           <h2 className="text-xl font-semibold text-ink">Negócio (MVP)</h2>
           <p className="mt-1 text-sm text-muted">
-            Trial 7 dias · faixas por estoque · loja WhatsApp no Pro · Pix+IA no
-            Master
+            Trial 14 dias com cartão · faixas por estoque · loja WhatsApp no Pro
+            · Pix+IA no Master
           </p>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             {negocio.map((plan) => (
@@ -100,6 +94,12 @@ export default function HomePage() {
                     <li key={e}>· {e}</li>
                   ))}
                 </ul>
+                <Link
+                  href={`/cadastro?plano=${plan.code}`}
+                  className="mt-5 inline-block rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent-dark"
+                >
+                  Começar teste
+                </Link>
               </article>
             ))}
           </div>

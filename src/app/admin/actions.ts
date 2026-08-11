@@ -1,13 +1,13 @@
 "use server";
 
-import bcrypt from "bcryptjs";
 import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { memberships, tenants, users } from "@/db/schema";
+import { tenants } from "@/db/schema";
 import { getAuthContext } from "@/lib/auth/context";
 import { requirePlatformAdmin } from "@/lib/auth/guards";
 import { getPlan, PLANS } from "@/lib/plans";
+import { provisionTenantAccount } from "@/lib/tenants/provision";
 
 const STATUSES = [
   "trialing",
@@ -16,17 +16,6 @@ const STATUSES = [
   "canceled",
   "suspended",
 ] as const;
-
-function slugify(raw: string) {
-  return raw
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 60);
-}
 
 export type CreateTenantResult =
   | {
@@ -53,102 +42,33 @@ export async function createTenantAccount(input: {
     return { ok: false, error: "Não autorizado." };
   }
 
-  const tenantName = input.tenantName.trim();
-  const ownerName = input.ownerName.trim();
-  const ownerEmail = input.ownerEmail.trim().toLowerCase();
-  const planCode = input.planCode?.trim() || "business_trial";
-  const plan = getPlan(planCode);
-  if (!plan) return { ok: false, error: "Plano inválido." };
-  if (!tenantName) return { ok: false, error: "Nome do sebo obrigatório." };
-  if (!ownerName) return { ok: false, error: "Nome do responsável obrigatório." };
-  if (!ownerEmail || !ownerEmail.includes("@")) {
-    return { ok: false, error: "E-mail inválido." };
-  }
-
-  let slug = slugify(input.slug?.trim() || tenantName);
-  if (!slug) return { ok: false, error: "Slug inválido." };
-  if (!slug.startsWith("sebo-") && plan.product === "business") {
-    slug = `sebo-${slug}`.slice(0, 60);
-  }
-
   const password =
     input.password?.trim() ||
     `Ga${Math.random().toString(36).slice(2, 8)}!`;
-  if (password.length < 6) {
-    return { ok: false, error: "Senha com pelo menos 6 caracteres." };
-  }
 
-  const [emailTaken] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.email, ownerEmail))
-    .limit(1);
-  if (emailTaken) {
-    return { ok: false, error: "Já existe usuário com este e-mail." };
-  }
+  const result = await provisionTenantAccount({
+    tenantName: input.tenantName,
+    slug: input.slug,
+    ownerName: input.ownerName,
+    ownerEmail: input.ownerEmail,
+    password,
+    planCode: input.planCode?.trim() || "business_trial",
+    trialDays: input.trialDays,
+    status: "trialing",
+  });
 
-  const [slugTaken] = await db
-    .select({ id: tenants.id })
-    .from(tenants)
-    .where(eq(tenants.slug, slug))
-    .limit(1);
-  if (slugTaken) {
-    return { ok: false, error: `Slug "${slug}" já está em uso.` };
-  }
+  if (!result.ok) return result;
 
-  const trialDays = Math.max(
-    1,
-    Math.min(90, Math.floor(input.trialDays ?? plan.trialDays ?? 14)),
-  );
-  const trialEnds = new Date();
-  trialEnds.setDate(trialEnds.getDate() + trialDays);
+  revalidatePath("/admin");
+  revalidatePath("/admin/tenants");
 
-  const passwordHash = await bcrypt.hash(password, 10);
-
-  try {
-    const [user] = await db
-      .insert(users)
-      .values({
-        email: ownerEmail,
-        name: ownerName,
-        passwordHash,
-        isPlatformAdmin: false,
-      })
-      .returning();
-
-    const [tenant] = await db
-      .insert(tenants)
-      .values({
-        name: tenantName,
-        slug,
-        product: plan.product,
-        planCode: plan.code,
-        status: "trialing",
-        trialEndsAt: trialEnds,
-        storeEnabled: plan.product === "business",
-      })
-      .returning();
-
-    await db.insert(memberships).values({
-      tenantId: tenant.id,
-      userId: user.id,
-      role: "owner",
-    });
-
-    revalidatePath("/admin");
-    revalidatePath("/admin/tenants");
-
-    return {
-      ok: true,
-      tenantId: tenant.id,
-      slug: tenant.slug,
-      email: ownerEmail,
-      password,
-    };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, error: `Falha ao criar conta: ${msg}` };
-  }
+  return {
+    ok: true,
+    tenantId: result.tenantId,
+    slug: result.slug,
+    email: result.email,
+    password,
+  };
 }
 
 export async function updateTenantPlan(tenantId: string, planCode: string) {

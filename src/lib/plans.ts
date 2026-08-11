@@ -76,7 +76,7 @@ export const PLANS: Record<string, PlanDefinition> = {
     name: "Teste",
     priceMonthlyBrl: null,
     maxBooks: null,
-    trialDays: 7,
+    trialDays: 14,
     entitlements: [
       "catalog",
       "clients",
@@ -94,6 +94,7 @@ export const PLANS: Record<string, PlanDefinition> = {
     name: "Essencial",
     priceMonthlyBrl: 89.9,
     maxBooks: 500,
+    trialDays: 14,
     entitlements: ["catalog", "clients", "orders", "reports_basic"],
   },
   business_profissional: {
@@ -102,6 +103,7 @@ export const PLANS: Record<string, PlanDefinition> = {
     name: "Profissional",
     priceMonthlyBrl: 149.9,
     maxBooks: 2000,
+    trialDays: 14,
     entitlements: [
       "catalog",
       "clients",
@@ -117,6 +119,7 @@ export const PLANS: Record<string, PlanDefinition> = {
     name: "Master",
     priceMonthlyBrl: 249.9,
     maxBooks: null,
+    trialDays: 14,
     entitlements: [
       "catalog",
       "clients",
