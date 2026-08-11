@@ -10,6 +10,7 @@ import {
   listSalesReport,
   listStockReport,
   paymentBreakdown,
+  rankClients,
   statusBreakdown,
   topBooksSold,
 } from "@/lib/reports/queries";
@@ -198,7 +199,7 @@ async function ReportBody({
   advanced: boolean;
   exportQuery: string;
 }) {
-  const [kpis, sales, payments, statuses, topBooks, daily, stock] =
+  const [kpis, sales, payments, statuses, topBooks, daily, stock, topSpend, topActive, topRecent] =
     await Promise.all([
       getReportKpis(tenantId, dataIni, dataFim),
       listSalesReport(tenantId, dataIni, dataFim, {
@@ -212,6 +213,9 @@ async function ReportBody({
         ? dailyRevenueSeries(tenantId, dataIni, dataFim)
         : Promise.resolve([]),
       listStockReport(tenantId),
+      rankClients(tenantId, dataIni, dataFim, "spent", advanced ? 15 : 10),
+      rankClients(tenantId, dataIni, dataFim, "orders", advanced ? 15 : 10),
+      rankClients(tenantId, dataIni, dataFim, "recency", advanced ? 15 : 10),
     ]);
 
   const maxDaily = Math.max(1, ...daily.map((d) => d.total));
@@ -375,6 +379,145 @@ async function ReportBody({
                     </td>
                     <td className="num">{b.qty}</td>
                     <td className="num">{money(b.revenue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      <div className="split">
+        <div className="panel">
+          <div className="panel-h">
+            <h2>Melhores clientes</h2>
+            <a
+              className="btn btn-ghost"
+              href={`/api/painel/reports/export?tipo=clientes&sort=spent&${exportQuery}`}
+            >
+              CSV
+            </a>
+          </div>
+          <div className="panel-b table-wrap">
+            {topSpend.length === 0 ? (
+              <p className="empty">Sem compras no período.</p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th className="num">Pedidos</th>
+                    <th className="num">Gasto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topSpend.map((c) => (
+                    <tr key={c.clientId}>
+                      <td>
+                        <Link
+                          href={`/painel/clientes/${c.clientId}`}
+                          className="font-medium text-ink hover:text-accent-text"
+                        >
+                          {c.name}
+                        </Link>
+                        {c.whatsapp ? (
+                          <div className="text-xs text-muted">{c.whatsapp}</div>
+                        ) : null}
+                      </td>
+                      <td className="num">{c.orders}</td>
+                      <td className="num">{money(c.spent)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="panel-h">
+            <h2>Mais ativos</h2>
+            <a
+              className="btn btn-ghost"
+              href={`/api/painel/reports/export?tipo=clientes&sort=orders&${exportQuery}`}
+            >
+              CSV
+            </a>
+          </div>
+          <div className="panel-b table-wrap">
+            {topActive.length === 0 ? (
+              <p className="empty">Sem compras no período.</p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th className="num">Pedidos</th>
+                    <th className="num">Livros</th>
+                    <th className="num">Gasto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topActive.map((c) => (
+                    <tr key={c.clientId}>
+                      <td>
+                        <Link href={`/painel/clientes/${c.clientId}`}>
+                          {c.name}
+                        </Link>
+                      </td>
+                      <td className="num">{c.orders}</td>
+                      <td className="num">{c.books}</td>
+                      <td className="num">{money(c.spent)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel-h">
+          <h2>Compraram recentemente</h2>
+          <a
+            className="btn btn-ghost"
+            href={`/api/painel/reports/export?tipo=clientes&sort=recency&${exportQuery}`}
+          >
+            CSV
+          </a>
+        </div>
+        <div className="panel-b table-wrap">
+          {topRecent.length === 0 ? (
+            <p className="empty">Sem compras no período.</p>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Última compra</th>
+                  <th className="num">Pedidos</th>
+                  <th className="num">Gasto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topRecent.map((c) => (
+                  <tr key={`r-${c.clientId}`}>
+                    <td>
+                      <Link href={`/painel/clientes/${c.clientId}`}>
+                        {c.name}
+                      </Link>
+                      {c.city ? (
+                        <div className="text-xs text-muted">{c.city}</div>
+                      ) : null}
+                    </td>
+                    <td>
+                      {c.lastOrderAt
+                        ? c.lastOrderAt.toLocaleDateString("pt-BR")
+                        : "—"}
+                    </td>
+                    <td className="num">{c.orders}</td>
+                    <td className="num">{money(c.spent)}</td>
                   </tr>
                 ))}
               </tbody>

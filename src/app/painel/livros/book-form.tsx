@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { BookCapture, type CaptureMode } from "@/components/book-capture";
 import { PhoneQrModal } from "@/components/phone-qr-modal";
+import { usePocketMode } from "@/hooks/use-pocket-mode";
 import { createBook, updateBook } from "@/lib/books/actions";
 import {
   cropDataUrlToCover,
@@ -147,8 +148,10 @@ type SrcState = "idle" | "searching" | "found" | "notfound";
 export function BookForm({ initial }: { initial?: BookFormInitial }) {
   const router = useRouter();
   const isEdit = Boolean(initial?.id);
+  const pocket = usePocketMode();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [pocketSavedTitle, setPocketSavedTitle] = useState<string | null>(null);
   const [isbnBusca, setIsbnBusca] = useState(initial?.isbn || "");
   const [src, setSrc] = useState<Record<string, SrcState>>({});
   const [isbnMsg, setIsbnMsg] = useState<string | null>(null);
@@ -157,6 +160,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
   const [captureMode, setCaptureMode] = useState<CaptureMode>("barcode");
   const [phoneQrOpen, setPhoneQrOpen] = useState(false);
   const pcPhotoRef = useRef<HTMLInputElement>(null);
+  const pocketAutoCapture = useRef(false);
 
   const [isbn, setIsbn] = useState(initial?.isbn || "");
   const [location, setLocation] = useState(initial?.location || "");
@@ -707,6 +711,50 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
     setPhoneQrOpen(true);
   }
 
+  function resetForNextBook() {
+    setPocketSavedTitle(null);
+    setError(null);
+    setIsbnBusca("");
+    setSrc({});
+    setIsbnMsg(null);
+    setShowProgress(false);
+    setIsbn("");
+    setLocation("");
+    setTitle("");
+    setAuthor("");
+    setPublisher("");
+    setYear("");
+    setGenre("");
+    setLanguage("Português");
+    setSynopsis("");
+    setPurchasePrice("");
+    setSalePrice("");
+    setStock("1");
+    setWeight("");
+    setPages("");
+    setCondition("");
+    setCoverType("Brochura");
+    setCoverUrl("");
+    setPhotoRaw("");
+    setCoverKind("");
+    setTagsSet(new Set());
+    setTagInput("");
+    setTagSugest([]);
+    setAiQuery("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    // reabre câmera no próximo tick
+    setTimeout(() => openCapture("barcode"), 350);
+  }
+
+  useEffect(() => {
+    if (!pocket || isEdit || pocketAutoCapture.current || pocketSavedTitle) {
+      return;
+    }
+    pocketAutoCapture.current = true;
+    const t = setTimeout(() => openCapture("barcode"), 400);
+    return () => clearTimeout(t);
+  }, [pocket, isEdit, pocketSavedTitle]);
+
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -730,7 +778,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
           capaUrl: capa,
           genero: genre || null,
           idioma: language || "Português",
-          peso: Number(weight),
+          peso: Number(weight) || (pocket ? 300 : Number(weight)),
           estado: condition as "Novo" | "Ótimo" | "Bom" | "Regular",
           tipoCapa: coverType as "Brochura" | "Capa Dura",
           precoCompra: purchasePrice ? Number(purchasePrice) : null,
@@ -744,6 +792,10 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
           : await createBook(payload);
         if (!result.ok) {
           setError(result.error);
+          return;
+        }
+        if (pocket && !isEdit) {
+          setPocketSavedTitle(title || "Livro");
           return;
         }
         router.push("/painel/livros");
@@ -770,13 +822,38 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
   };
 
   return (
-    <div className="livros-page">
+    <div className={`livros-page${pocket ? " is-pocket" : ""}`}>
+      {pocketSavedTitle ? (
+        <div className="pocket-saved">
+          <div className="pocket-saved-check" aria-hidden>
+            ✓
+          </div>
+          <h2>Na prateleira</h2>
+          <p>
+            <strong>{pocketSavedTitle}</strong> foi cadastrado.
+          </p>
+          <div className="pocket-saved-actions">
+            <button
+              type="button"
+              className="btn-accent pocket-cta"
+              onClick={resetForNextBook}
+            >
+              Cadastrar outro
+            </button>
+            <Link href="/painel/livros" className="btn-outline pocket-cta">
+              Ver catálogo
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
+      <div className={pocketSavedTitle ? "hidden" : undefined}>
       <div className="page-header">
         <div>
-          <h4>{isEdit ? "Editar Livro" : "Novo Livro"}</h4>
+          <h4>{isEdit ? "Editar Livro" : pocket ? "Cadastrar na prateleira" : "Novo Livro"}</h4>
           <nav className="text-xs text-muted">
             <Link href="/painel/livros">Livros</Link> /{" "}
-            {isEdit ? "Editar" : "Novo"}
+            {isEdit ? "Editar" : pocket ? "Bolso" : "Novo"}
           </nav>
         </div>
         <Link
@@ -790,15 +867,78 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
       <div className="card mb-4 isbn-lookup-card">
         <div className="card-body">
           <div className="isbn-lookup-top">
-            <div className="isbn-lookup-icon">ISBN</div>
+            <div className="isbn-lookup-icon">{pocket ? "📷" : "ISBN"}</div>
             <div className="isbn-lookup-copy">
-              <div className="isbn-lookup-title">Identificar o livro</div>
+              <div className="isbn-lookup-title">
+                {pocket ? "Identificar com a câmera" : "Identificar o livro"}
+              </div>
               <div className="isbn-lookup-sub">
-                Três caminhos: teclado neste PC, webcam deste PC, ou celular via QR
+                {pocket
+                  ? "Leia o código ou fotografe a capa — tudo neste celular"
+                  : "Três caminhos: teclado neste PC, webcam deste PC, ou celular via QR"}
               </div>
             </div>
           </div>
 
+          {pocket ? (
+            <div className="pocket-capture">
+              <button
+                type="button"
+                className="pocket-capture-primary"
+                onClick={() => openCapture("barcode")}
+              >
+                Ler código de barras
+              </button>
+              <div className="pocket-capture-row">
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={() => openCapture("cover")}
+                >
+                  Foto da capa
+                </button>
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={() => pcPhotoRef.current?.click()}
+                >
+                  Galeria
+                </button>
+              </div>
+              <div className="isbn-input-group mt-2">
+                <input
+                  value={isbnBusca}
+                  onChange={(e) => setIsbnBusca(e.target.value)}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && (e.preventDefault(), void buscarISBN())
+                  }
+                  className="form-control"
+                  placeholder="ISBN ou título…"
+                  maxLength={120}
+                  inputMode="search"
+                />
+                <button
+                  type="button"
+                  className="btn-accent"
+                  onClick={() => void buscarISBN()}
+                >
+                  Buscar
+                </button>
+              </div>
+              <input
+                ref={pcPhotoRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="book-capture-file-input"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) void buscarIAFoto(f);
+                }}
+              />
+            </div>
+          ) : (
           <div className="isbn-worlds">
             <div className="isbn-world">
               <div className="isbn-world-label">1 · Teclado / arquivo</div>
@@ -879,6 +1019,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
               </p>
             </div>
           </div>
+          )}
 
           {showProgress ? (
             <div className="isbn-source-row mb-2 mt-3">
@@ -937,23 +1078,27 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
         }}
       />
 
-      <PhoneQrModal
-        open={phoneQrOpen}
-        onClose={() => setPhoneQrOpen(false)}
-        onIsbn={(code) => {
-          setIsbnBusca(code);
-          void buscarISBN(code);
-        }}
-        onCoverPhoto={(dataUrl) => {
-          void buscarIAFoto(dataUrl);
-        }}
-      />
+      {!pocket ? (
+        <PhoneQrModal
+          open={phoneQrOpen}
+          onClose={() => setPhoneQrOpen(false)}
+          onIsbn={(code) => {
+            setIsbnBusca(code);
+            void buscarISBN(code);
+          }}
+          onCoverPhoto={(dataUrl) => {
+            void buscarIAFoto(dataUrl);
+          }}
+        />
+      ) : null}
 
       <form onSubmit={onSubmit}>
         <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
           <div>
             <div className="card mb-3">
-              <div className="card-header">Dados do Livro</div>
+              <div className="card-header">
+                {pocket ? "Prateleira — o essencial" : "Dados do Livro"}
+              </div>
               <div className="card-body grid gap-3 md:grid-cols-2">
                 <div>
                   <label className="form-label">ISBN</label>
@@ -991,6 +1136,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
                     onChange={(e) => setAuthor(e.target.value)}
                   />
                 </div>
+                {!pocket ? (
                 <div>
                   <label className="form-label">Editora</label>
                   <input
@@ -999,6 +1145,59 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
                     onChange={(e) => setPublisher(e.target.value)}
                   />
                 </div>
+                ) : null}
+                {pocket ? (
+                  <details className="pocket-more md:col-span-2">
+                    <summary>Mais detalhes (editora, sinopse…)</summary>
+                    <div className="mt-3 grid gap-3">
+                      <div>
+                        <label className="form-label">Editora</label>
+                        <input
+                          className="form-control"
+                          value={publisher}
+                          onChange={(e) => setPublisher(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="form-label">Ano</label>
+                        <input
+                          type="number"
+                          min={1000}
+                          max={yearMax}
+                          className="form-control"
+                          value={year}
+                          onChange={(e) => setYear(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="form-label">Gênero / Categoria</label>
+                        <input
+                          className="form-control"
+                          value={genre}
+                          onChange={(e) => setGenre(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="form-label">Idioma</label>
+                        <input
+                          className="form-control"
+                          value={language}
+                          onChange={(e) => setLanguage(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="form-label">Sinopse</label>
+                        <textarea
+                          className="form-control"
+                          rows={3}
+                          value={synopsis}
+                          onChange={(e) => setSynopsis(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </details>
+                ) : (
+                  <>
                 <div>
                   <label className="form-label">Ano</label>
                   <input
@@ -1035,9 +1234,56 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
                     onChange={(e) => setSynopsis(e.target.value)}
                   />
                 </div>
+                  </>
+                )}
               </div>
             </div>
 
+            {pocket ? (
+              <details className="card mb-3 pocket-more-card">
+                <summary className="card-header" style={{ cursor: "pointer" }}>
+                  Tags de pesquisa (opcional)
+                </summary>
+                <div className="card-body">
+                  <div
+                    className="mb-2 flex min-h-10 flex-wrap gap-2 rounded border border-line p-2"
+                    style={{ background: "#f8fafc" }}
+                  >
+                    {!tags.length ? (
+                      <span className="text-xs italic text-muted">
+                        Nenhuma tag — adicione abaixo
+                      </span>
+                    ) : (
+                      tags.map((t) => (
+                        <span
+                          key={t}
+                          className="tag-pill"
+                          style={{ background: tagColor(t) }}
+                        >
+                          {t}
+                          <button type="button" onClick={() => remTag(t)}>
+                            ×
+                          </button>
+                        </span>
+                      ))
+                    )}
+                  </div>
+                  <input
+                    className="form-control"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addTag(tagInput);
+                        setTagInput("");
+                      }
+                    }}
+                    placeholder="Nova tag…"
+                  />
+                </div>
+              </details>
+            ) : (
             <div className="card mb-3">
               <div className="card-header">Tags de Pesquisa</div>
               <div className="card-body">
@@ -1114,6 +1360,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
                 </div>
               </div>
             </div>
+            )}
 
             <div className="card">
               <div className="card-header">Preços, Estoque e Físico</div>
@@ -1174,15 +1421,16 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
                 </div>
                 <div>
                   <label className="form-label">
-                    Peso <span className="required-star">*</span> (g)
+                    Peso {!pocket ? <span className="required-star">*</span> : null} (g)
                   </label>
                   <input
                     type="number"
                     min="1"
-                    required
+                    required={!pocket}
                     className="form-control"
                     value={weight}
                     onChange={(e) => setWeight(e.target.value)}
+                    placeholder={pocket ? "300 se vazio" : undefined}
                   />
                   <div className="form-text">
                     {weight
@@ -1334,13 +1582,15 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
           </p>
         ) : null}
 
-        <div className="mt-4 flex gap-2">
+        <div className={`mt-4 flex gap-2${pocket ? " pocket-submit" : ""}`}>
           <button type="submit" className="btn-accent px-4" disabled={pending}>
             {pending
               ? "Salvando…"
               : isEdit
                 ? "Salvar Alterações"
-                : "Cadastrar Livro"}
+                : pocket
+                  ? "Colocar na prateleira"
+                  : "Cadastrar Livro"}
           </button>
           <Link
             href="/painel/livros"
@@ -1350,6 +1600,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
           </Link>
         </div>
       </form>
+      </div>
     </div>
   );
 }

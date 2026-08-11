@@ -325,6 +325,99 @@ export async function dailyRevenueSeries(
   }));
 }
 
+export type ClientRankingRow = {
+  clientId: string;
+  name: string;
+  whatsapp: string | null;
+  email: string | null;
+  city: string | null;
+  orders: number;
+  spent: number;
+  books: number;
+  lastOrderAt: Date | null;
+};
+
+export type ClientRankingSort = "spent" | "orders" | "recency";
+
+/** Ranking de clientes no período (só pedidos debitáveis). */
+export async function rankClients(
+  tenantId: string,
+  dataIni: string,
+  dataFim: string,
+  sort: ClientRankingSort = "spent",
+  limit = 20,
+): Promise<ClientRankingRow[]> {
+  const perOrder = db
+    .select({
+      clientId: orders.clientId,
+      orderId: orders.id,
+      totalAmount: orders.totalAmount,
+      orderDate: orders.orderDate,
+      books: sql<number>`COALESCE(SUM(${orderItems.quantity}), 0)::int`.as(
+        "books",
+      ),
+    })
+    .from(orders)
+    .leftJoin(orderItems, eq(orderItems.orderId, orders.id))
+    .where(
+      and(
+        periodFilter(tenantId, dataIni, dataFim),
+        inArray(orders.status, [...DEBIT_STATUSES]),
+      ),
+    )
+    .groupBy(
+      orders.clientId,
+      orders.id,
+      orders.totalAmount,
+      orders.orderDate,
+    )
+    .as("per_order");
+
+  const orderExpr =
+    sort === "orders"
+      ? sql`COUNT(*) DESC`
+      : sort === "recency"
+        ? sql`MAX(${perOrder.orderDate}) DESC NULLS LAST`
+        : sql`COALESCE(SUM(${perOrder.totalAmount}), 0) DESC`;
+
+  const rows = await db
+    .select({
+      clientId: clients.id,
+      name: clients.name,
+      whatsapp: clients.whatsapp,
+      email: clients.email,
+      city: clients.city,
+      orders: sql<number>`COUNT(*)::int`,
+      spent: sql<string>`COALESCE(SUM(${perOrder.totalAmount}), 0)`,
+      books: sql<number>`COALESCE(SUM(${perOrder.books}), 0)::int`,
+      lastOrderAt: sql<Date | null>`MAX(${perOrder.orderDate})`,
+    })
+    .from(clients)
+    .innerJoin(perOrder, eq(perOrder.clientId, clients.id))
+    .where(eq(clients.tenantId, tenantId))
+    .groupBy(
+      clients.id,
+      clients.name,
+      clients.whatsapp,
+      clients.email,
+      clients.city,
+    )
+    .orderBy(orderExpr)
+    .limit(limit);
+
+  return rows.map((r) => ({
+    clientId: r.clientId,
+    name: r.name,
+    whatsapp: r.whatsapp,
+    email: r.email,
+    city: r.city,
+    orders: Number(r.orders ?? 0),
+    spent: Number(r.spent ?? 0),
+    books: Number(r.books ?? 0),
+    lastOrderAt: r.lastOrderAt,
+  }));
+}
+
 export async function listStockReport(tenantId: string): Promise<StockRow[]> {
   const reservedByBook = db
     .select({

@@ -434,6 +434,13 @@ export default async function LivrosPage({
           </div>
         </div>
       </div>
+      <Link
+        href="/painel/livros/novo"
+        className="fab-novo"
+        aria-label="Cadastrar livro"
+      >
+        +
+      </Link>
     </div>
   );
 }

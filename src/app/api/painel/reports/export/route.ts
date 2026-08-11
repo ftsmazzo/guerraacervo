@@ -4,6 +4,7 @@ import { resolveReportPeriod } from "@/lib/reports/period";
 import {
   listSalesReport,
   listStockReport,
+  rankClients,
 } from "@/lib/reports/queries";
 
 function csvEscape(v: string | number | null | undefined) {
@@ -63,6 +64,42 @@ export async function GET(req: Request) {
         r.available,
         r.salePrice.toFixed(2),
         r.location,
+      ]),
+    );
+  } else if (tipo === "clientes") {
+    const sortRaw = url.searchParams.get("sort") || "spent";
+    const sort =
+      sortRaw === "orders" || sortRaw === "recency" ? sortRaw : "spent";
+    const rows = await rankClients(
+      ctx.tenant.id,
+      period.dataIni,
+      period.dataFim,
+      sort,
+      100,
+    );
+    filename = `clientes-${sort}-${period.dataIni}_${period.dataFim}.csv`;
+    csv = toCsv(
+      [
+        "Cliente",
+        "WhatsApp",
+        "E-mail",
+        "Cidade",
+        "Pedidos",
+        "Livros",
+        "Gasto",
+        "Última compra",
+      ],
+      rows.map((r) => [
+        r.name,
+        r.whatsapp,
+        r.email,
+        r.city,
+        r.orders,
+        r.books,
+        r.spent.toFixed(2),
+        r.lastOrderAt
+          ? r.lastOrderAt.toISOString().slice(0, 10)
+          : null,
       ]),
     );
   } else {
