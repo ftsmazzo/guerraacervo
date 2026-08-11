@@ -2,6 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { books, clients, orderItems, orders } from "@/db/schema";
+import { notifySeboReservation } from "@/lib/tenant-alerts";
 
 export type InternalOrderResult =
   | { ok: true; id: string }
@@ -18,7 +19,7 @@ export async function createOrderInternal(opts: {
   const qty = Math.max(1, opts.quantity ?? 1);
 
   const [client] = await db
-    .select({ id: clients.id })
+    .select({ id: clients.id, name: clients.name })
     .from(clients)
     .where(
       and(eq(clients.id, opts.clientId), eq(clients.tenantId, opts.tenantId)),
@@ -96,6 +97,15 @@ export async function createOrderInternal(opts: {
     revalidatePath(`/painel/pedidos/${orderId}`, "page");
     revalidatePath(`/painel/clientes/${opts.clientId}`, "page");
     revalidatePath("/painel", "layout");
+
+    void notifySeboReservation({
+      tenantId: opts.tenantId,
+      orderId,
+      bookTitle: book.title,
+      clientName: client.name,
+      source: "whatsapp",
+    }).catch((e) => console.warn("[reserve] notify sebo", e));
+
     return { ok: true, id: orderId };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

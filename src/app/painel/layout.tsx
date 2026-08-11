@@ -2,12 +2,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
 import { ManageSubscriptionButton } from "@/components/manage-subscription-button";
+import { ReservationAlertsBanner } from "@/components/reservation-alerts-banner";
 import {
   getAuthContext,
   hasEntitlement,
   tenantAccessOk,
 } from "@/lib/auth/context";
 import type { Entitlement } from "@/lib/plans";
+import { listTenantAlerts } from "@/lib/tenant-alerts";
 
 type NavItem = {
   href: string;
@@ -65,6 +67,9 @@ export default async function PainelLayout({
   const trial = ctx.tenant
     ? trialLabel(ctx.tenant.trialEndsAt, ctx.tenant.status)
     : null;
+  const alerts = ctx.tenant
+    ? await listTenantAlerts(ctx.tenant.id, 5)
+    : [];
 
   return (
     <div className="min-h-screen md:grid md:grid-cols-[230px_1fr]">
@@ -130,6 +135,9 @@ export default async function PainelLayout({
               Use &quot;Gerenciar assinatura&quot; para cartão ou cancelamento.
             </span>
           </div>
+        ) : null}
+        {access.ok && alerts.length ? (
+          <ReservationAlertsBanner alerts={alerts} />
         ) : null}
         {!access.ok ? (
           <div className="px-6 py-10">

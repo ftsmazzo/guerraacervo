@@ -16,9 +16,15 @@ import {
 } from "@/lib/whatsapp/evolution";
 import { setSuggestedBooks } from "@/lib/whatsapp/agent/debounce";
 import { getWhatsappConnection } from "@/lib/whatsapp/queries";
-import { isGenericInterestTag } from "@/lib/whatsapp/interest-tags";
+import {
+  filterInterestTags,
+  isGenericInterestTag,
+} from "@/lib/whatsapp/interest-tags";
 
 const QUEUE_KEY = "ga:wa:notify";
+
+/** Cliente só é avisado se cruzar pelo menos N tags com o livro. */
+export const MIN_INTEREST_TAG_OVERLAP = 3;
 
 export type NewBookNotifyJob = {
   type: "new_book";
@@ -56,21 +62,32 @@ async function bookInterestKeys(
     .innerJoin(tags, eq(tags.id, bookTags.tagId))
     .where(eq(bookTags.bookId, bookId));
 
-  const keys = new Set<string>();
-  for (const t of tagRows) {
-    const n = t.name.trim().toLowerCase();
-    if (n && !isGenericInterestTag(n)) keys.add(n);
-  }
-  if (book?.genre?.trim() && !isGenericInterestTag(book.genre)) {
-    keys.add(book.genre.trim().toLowerCase());
-  }
-  return [...keys];
+  const raw = tagRows.map((t) => t.name);
+  if (book?.genre?.trim()) raw.push(book.genre);
+  return filterInterestTags(raw);
 }
 
-async function recipientsForNewBook(tenantId: string, bookId: string) {
+type Recipient = {
+  id: string;
+  name: string;
+  whatsapp: string | null;
+  matched: string[];
+};
+
+async function recipientsForNewBook(
+  tenantId: string,
+  bookId: string,
+): Promise<Recipient[]> {
   const interestKeys = await bookInterestKeys(tenantId, bookId);
 
-  const base = db
+  // Sem tags suficientes no livro → não dispara (evita blast genérico)
+  if (interestKeys.length < MIN_INTEREST_TAG_OVERLAP) {
+    return [];
+  }
+
+  const bookKeySet = new Set(interestKeys);
+
+  const rows = await db
     .select({
       id: clients.id,
       name: clients.name,
@@ -94,11 +111,10 @@ async function recipientsForNewBook(tenantId: string, bookId: string) {
       ),
     );
 
-  const rows = await base;
   const genericTagIds: string[] = [];
   const byClient = new Map<
     string,
-    { id: string; name: string; whatsapp: string | null; matched?: string }
+    { id: string; name: string; whatsapp: string | null; matched: Set<string> }
   >();
 
   for (const r of rows) {
@@ -110,13 +126,11 @@ async function recipientsForNewBook(tenantId: string, bookId: string) {
       id: r.id,
       name: r.name,
       whatsapp: r.whatsapp,
+      matched: new Set<string>(),
     };
-    if (
-      interestKeys.length &&
-      r.tag &&
-      interestKeys.includes(r.tag.toLowerCase())
-    ) {
-      existing.matched = r.tag;
+    if (r.tag) {
+      const t = r.tag.trim().toLowerCase();
+      if (t && bookKeySet.has(t)) existing.matched.add(t);
     }
     byClient.set(r.id, existing);
   }
@@ -127,10 +141,17 @@ async function recipientsForNewBook(tenantId: string, bookId: string) {
       .where(inArray(clientInterestTags.id, [...new Set(genericTagIds)]));
   }
 
-  const all = [...byClient.values()].filter((c) => c.whatsapp);
-  if (!interestKeys.length) return all.map((c) => ({ ...c, matched: undefined }));
-  // Prefere match de tag; se ninguém bate, não spam — só quem tem interesse
-  return all.filter((c) => c.matched);
+  return [...byClient.values()]
+    .filter(
+      (c) =>
+        c.whatsapp && c.matched.size >= MIN_INTEREST_TAG_OVERLAP,
+    )
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      whatsapp: c.whatsapp,
+      matched: [...c.matched].slice(0, 6),
+    }));
 }
 
 export async function drainNotifyQueue(max = 20) {
@@ -158,6 +179,8 @@ export async function drainNotifyQueue(max = 20) {
       if (!conn || conn.status !== "open") continue;
 
       const recipients = await recipientsForNewBook(job.tenantId, job.bookId);
+      if (!recipients.length) continue;
+
       const price = Number(job.salePrice).toLocaleString("pt-BR", {
         style: "currency",
         currency: "BRL",
@@ -166,12 +189,13 @@ export async function drainNotifyQueue(max = 20) {
       for (const c of recipients) {
         const phone = normalizePhone(c.whatsapp || "");
         if (!phone) continue;
+        const interests = c.matched.join(", ");
         const text = [
-          `📚 *Novo no acervo!*`,
+          `*Chegou algo na sua linha*`,
           `*${job.title}*`,
           job.author ? `Autor: ${job.author}` : null,
           `Preço: ${price}`,
-          c.matched ? `Pelo seu interesse em _${c.matched}_.` : null,
+          `Combinou com seus interesses: _${interests}_.`,
           ``,
           `Quer reservar? Responda *reservar* ou peça *indicações*.`,
         ]
