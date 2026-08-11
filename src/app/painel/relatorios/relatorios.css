@@ -1,0 +1,268 @@
+/* Relatórios — dashboard KPIs + tabelas */
+
+.relatorios-page .filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 0.75rem;
+  align-items: flex-end;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.relatorios-page .filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.relatorios-page .filters input,
+.relatorios-page .filters select {
+  min-height: 2.35rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.875rem;
+  background: var(--background);
+  color: var(--ink);
+}
+
+.relatorios-page .filters .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.relatorios-page .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.35rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.835rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.relatorios-page .btn-accent {
+  background: var(--accent);
+  color: #fff;
+}
+
+.relatorios-page .btn-accent:hover {
+  background: var(--accent-dark);
+}
+
+.relatorios-page .btn-ghost {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--muted-2);
+}
+
+.relatorios-page .btn-ghost:hover {
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.relatorios-page .btn-ghost.is-active {
+  border-color: var(--accent);
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
+
+.relatorios-page .kpi-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 1.25rem;
+}
+
+@media (min-width: 768px) {
+  .relatorios-page .kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.relatorios-page .kpi {
+  border-radius: 10px;
+  padding: 1rem 1.05rem;
+  color: #fff;
+  min-height: 5.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: var(--shadow);
+}
+
+.relatorios-page .kpi-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.9;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.relatorios-page .kpi-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.15;
+  margin-top: 0.35rem;
+}
+
+.relatorios-page .kpi-hint {
+  font-size: 0.72rem;
+  opacity: 0.85;
+  margin-top: 0.35rem;
+}
+
+.relatorios-page .kpi-green {
+  background: linear-gradient(135deg, #27ae60, #1e8449);
+}
+.relatorios-page .kpi-blue {
+  background: linear-gradient(135deg, #2980b9, #1a5276);
+}
+.relatorios-page .kpi-orange {
+  background: linear-gradient(135deg, #e67e22, #c2410c);
+}
+.relatorios-page .kpi-slate {
+  background: linear-gradient(135deg, #57534e, #292524);
+}
+.relatorios-page .kpi-teal {
+  background: linear-gradient(135deg, #0d9488, #115e59);
+}
+.relatorios-page .kpi-amber {
+  background: linear-gradient(135deg, #d97706, #92400e);
+}
+.relatorios-page .kpi-violet {
+  background: linear-gradient(135deg, #7c3aed, #5b21b6);
+}
+.relatorios-page .kpi-rose {
+  background: linear-gradient(135deg, #e11d48, #9f1239);
+}
+
+.relatorios-page .panel {
+  margin-top: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  overflow: hidden;
+}
+
+.relatorios-page .panel-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.relatorios-page .panel-h h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.relatorios-page .panel-b {
+  padding: 0.75rem 1rem 1rem;
+}
+
+.relatorios-page .split {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 900px) {
+  .relatorios-page .split {
+    grid-template-columns: 1.2fr 1fr;
+  }
+}
+
+.relatorios-page .bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.35rem;
+  height: 140px;
+  padding-top: 0.5rem;
+}
+
+.relatorios-page .bar-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+
+.relatorios-page .bar {
+  width: 100%;
+  max-width: 28px;
+  border-radius: 4px 4px 0 0;
+  background: var(--accent);
+  min-height: 2px;
+}
+
+.relatorios-page .bar-label {
+  font-size: 0.58rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.relatorios-page table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.835rem;
+}
+
+.relatorios-page th,
+.relatorios-page td {
+  padding: 0.55rem 0.4rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.relatorios-page th {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.relatorios-page .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.relatorios-page .empty {
+  padding: 1.5rem 0.5rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.relatorios-page .pill {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
