@@ -4,6 +4,7 @@ import { LogoutButton } from "@/components/logout-button";
 import { ManageSubscriptionButton } from "@/components/manage-subscription-button";
 import { PainelMobileNav } from "@/components/painel-mobile-nav";
 import { PushAlertsCard } from "@/components/push-enable-button";
+import { RegisterPainelServiceWorker } from "@/components/register-painel-sw";
 import { ReservationAlertsBanner } from "@/components/reservation-alerts-banner";
 import {
   getAuthContext,
@@ -72,7 +73,8 @@ export default async function PainelLayout({
   const alerts = ctx.tenant ? await listTenantAlerts(ctx.tenant.id, 5) : [];
 
   return (
-    <div className="min-h-screen md:grid md:grid-cols-[230px_1fr]">
+    <div className="painel-shell min-h-screen md:grid md:grid-cols-[230px_1fr]">
+      <RegisterPainelServiceWorker />
       <aside className="hidden border-r border-line bg-sidebar-bg md:block">
         <div className="flex h-[58px] items-center gap-2.5 border-b border-line px-3.5">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[7px] bg-accent text-sm font-semibold text-white">

@@ -157,15 +157,15 @@ export function PushAlertsCard({ variant = "card" }: { variant?: Variant }) {
         <p className="text-xs font-medium text-ink">Alertas no celular</p>
         {!canActivate && env.isIos ? (
           <p className="mt-1 text-[0.7rem] leading-snug text-muted">
-            iPhone: Compartilhar → Adicionar à Tela de Início → abrir o ícone →
-            voltar em Loja e ativar.
+            iPhone: abra <a href="/painel/loja#app-celular" className="underline">Loja</a> e
+            siga o tutorial (Safari → Compartilhar → Tela de Início).
           </p>
         ) : (
           <button
             type="button"
             disabled={pending || (!canActivate && !enabled)}
             onClick={enabled ? disable : enable}
-            className="mt-1 text-xs font-medium text-accent-text underline disabled:opacity-50"
+            className="mt-1 min-h-9 text-xs font-medium text-accent-text underline disabled:opacity-50"
           >
             {pending
               ? "…"
@@ -187,17 +187,18 @@ export function PushAlertsCard({ variant = "card" }: { variant?: Variant }) {
     <div className="rounded-lg border border-line bg-card p-5 shadow-[var(--shadow)]">
       <h3 className="text-sm font-semibold text-ink">Notificações no celular</h3>
       <p className="mt-1 text-sm text-muted">
-        Receba aviso na hora da reserva para tirar o livro da prateleira — mesmo
-        com o painel fechado.
+        Depois de instalar o app (passo acima), ative aqui para receber reserva
+        mesmo com o painel fechado.
       </p>
 
       {env.isIos && !env.isStandalone ? (
-        <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-ink">
-          <li>No Safari, toque em Compartilhar.</li>
-          <li>Escolha <strong>Adicionar à Tela de Início</strong>.</li>
-          <li>Abra o GuerraAcervo pelo ícone novo (não pelo Safari).</li>
-          <li>Volte em Loja e toque em Ativar abaixo.</li>
-        </ol>
+        <p className="mt-3 rounded-md border border-dashed border-line bg-background px-3 py-2 text-sm text-muted">
+          Ainda no Safari? Complete o tutorial{" "}
+          <a href="#app-celular" className="font-medium text-accent-text underline">
+            App no celular
+          </a>{" "}
+          e abra pelo ícone da tela inicial — aí o botão Ativar libera.
+        </p>
       ) : null}
 
       {!env.hasPush && !env.isIos ? (

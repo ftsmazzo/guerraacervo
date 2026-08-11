@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
+import { PushAlertsCard } from "@/components/push-enable-button";
+import { MobileAppInstallGuide } from "@/components/mobile-app-install-guide";
 import { getAuthContext, hasEntitlement } from "@/lib/auth/context";
 import { getReservationNotifyWhatsapp } from "@/lib/loja/settings";
 import { resolveEvolutionConfig } from "@/lib/whatsapp/evolution";
 import { getWhatsappConnection } from "@/lib/whatsapp/queries";
 import { ReservationNotifyForm } from "./reservation-notify-form";
 import { WhatsappPanel } from "./whatsapp-panel";
-import { PushAlertsCard } from "@/components/push-enable-button";
 
 export default async function LojaPage() {
   const ctx = await getAuthContext();
@@ -26,16 +27,43 @@ export default async function LojaPage() {
   const notifyPhone = await getReservationNotifyWhatsapp();
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold text-ink">Loja</h1>
-      <p className="mt-1 max-w-xl text-sm text-muted">
-        Canal WhatsApp do sebo — conexão, alertas de reserva e avisos de
-        novidades.
+    <div className="mx-auto max-w-2xl">
+      <h1 className="text-2xl font-semibold text-ink">Loja e alertas</h1>
+      <p className="mt-1 text-sm text-muted">
+        Instale o app no celular da prateleira, ative notificações e conecte o
+        WhatsApp do sebo.
       </p>
+
       <div className="mt-6 space-y-8">
-        <div>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
-            WhatsApp do sebo
+        <section aria-labelledby="app-title">
+          <h2
+            id="app-title"
+            className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted"
+          >
+            1 · App no celular
+          </h2>
+          <div className="space-y-4">
+            <MobileAppInstallGuide />
+            <PushAlertsCard />
+          </div>
+        </section>
+
+        <section aria-labelledby="wa-alert-title">
+          <h2
+            id="wa-alert-title"
+            className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted"
+          >
+            2 · WhatsApp de alerta (prateleira)
+          </h2>
+          <ReservationNotifyForm initialPhone={notifyPhone} />
+        </section>
+
+        <section aria-labelledby="wa-store-title">
+          <h2
+            id="wa-store-title"
+            className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted"
+          >
+            3 · WhatsApp do sebo (clientes)
           </h2>
           <WhatsappPanel
             configured={configured}
@@ -46,16 +74,7 @@ export default async function LojaPage() {
               instanceName: conn?.instanceName ?? null,
             }}
           />
-        </div>
-        <div>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
-            Alertas
-          </h2>
-          <div className="space-y-4">
-            <PushAlertsCard />
-            <ReservationNotifyForm initialPhone={notifyPhone} />
-          </div>
-        </div>
+        </section>
       </div>
     </div>
   );

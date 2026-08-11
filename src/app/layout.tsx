@@ -28,13 +28,20 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
   },
   icons: {
-    icon: "/guerraacervo-icon.png",
-    apple: "/guerraacervo-icon.png",
+    icon: [{ url: "/guerraacervo-icon.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/guerraacervo-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
   },
 };
 
 export const viewport: Viewport = {
   themeColor: "#e67e22",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

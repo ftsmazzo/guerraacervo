@@ -16,8 +16,8 @@ const items = [
     match: (p: string) => p.startsWith("/painel/livros"),
   },
   {
-    href: "/painel/loja",
-    label: "Alertas",
+    href: "/painel/loja#app-celular",
+    label: "Loja",
     match: (p: string) => p.startsWith("/painel/loja"),
   },
 ] as const;

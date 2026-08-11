@@ -2,12 +2,14 @@
   "name": "GuerraAcervo Painel",
   "short_name": "GuerraAcervo",
   "description": "Painel do sebo — reservas e catálogo",
-  "start_url": "/painel",
+  "start_url": "/painel?source=pwa",
   "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#f9f7f4",
   "theme_color": "#e67e22",
   "lang": "pt-BR",
+  "categories": ["business", "productivity"],
   "icons": [
     {
       "src": "/guerraacervo-icon.png",
@@ -19,7 +21,13 @@
       "src": "/guerraacervo-icon.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/guerraacervo-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

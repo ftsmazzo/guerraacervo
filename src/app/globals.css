@@ -56,3 +56,30 @@ a {
   color: inherit;
   text-decoration: none;
 }
+
+/* Painel mobile — touch e overflow */
+.painel-shell {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.painel-shell input,
+.painel-shell select,
+.painel-shell textarea,
+.painel-shell button {
+  font-size: 16px; /* evita zoom automático no iOS */
+}
+
+@media (max-width: 767px) {
+  .painel-shell .table-wrap,
+  .painel-shell .ga-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-inline: -1rem;
+    padding-inline: 1rem;
+  }
+
+  .painel-shell table {
+    min-width: 560px;
+  }
+}
+

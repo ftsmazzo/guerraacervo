@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getAuthContext, hasEntitlement } from "@/lib/auth/context";
 import { countTenantClients } from "@/lib/clients/queries";
 import { countOpenOrders } from "@/lib/orders/queries";
@@ -53,6 +54,13 @@ export default async function PainelDashboardPage() {
           : plan
             ? " · livros ilimitados"
             : null}
+        .
+      </p>
+      <p className="mt-3 rounded-md border border-line bg-card px-3 py-2.5 text-sm text-muted md:hidden">
+        No celular da prateleira:{" "}
+        <Link href="/painel/loja#app-celular" className="font-medium text-accent-text underline">
+          instale o app e ative alertas
+        </Link>
         .
       </p>
       {!limit.ok ? (
