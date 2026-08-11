@@ -1,135 +1,108 @@
 import Link from "next/link";
-import { businessPlans, personalPlans } from "@/lib/plans";
-
-function formatPrice(value: number | null) {
-  if (value === null) return "Trial";
-  if (value === 0) return "Grátis";
-  return value.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
-}
+import { PlanPicker } from "@/components/landing/plan-picker";
+import { businessPlans } from "@/lib/plans";
+import "@/components/landing/landing.css";
 
 export default function HomePage() {
   const negocio = businessPlans();
-  const pessoal = personalPlans();
 
   return (
-    <main className="min-h-screen">
-      <header className="border-b border-line bg-card">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <div>
-            <p className="text-lg font-semibold tracking-tight text-ink">
-              GuerraAcervo
-            </p>
-            <p className="text-xs text-muted">SaaS para sebos e coleções</p>
-          </div>
-          <nav className="flex items-center gap-3 text-sm">
-            <Link
-              href="/login"
-              className="rounded-md px-3 py-1.5 text-muted hover:text-ink"
-            >
-              Entrar
-            </Link>
-            <Link
-              href="/cadastro"
-              className="rounded-md bg-accent px-3 py-1.5 font-medium text-white hover:bg-accent-dark"
-            >
-              Começar teste
-            </Link>
-          </nav>
-        </div>
-      </header>
+    <div className="landing">
+      <nav className="landing-nav" aria-label="Principal">
+        <span className="landing-nav__brand">GuerraAcervo</span>
+        <Link href="/login" className="landing-nav__link">
+          Entrar
+        </Link>
+      </nav>
 
-      <section className="mx-auto max-w-5xl px-6 py-16">
-        <p className="mb-3 text-sm font-medium text-accent-text">GuerraAcervo</p>
-        <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-ink">
-          Gestão para sebos e coleções, online.
-        </h1>
-        <p className="mt-4 max-w-xl text-base leading-relaxed text-muted">
-          Planos Negócio e Pessoal, multi-tenant, Postgres e Redis. Base pronta
-          para auth, cobrança e o operacional do sebo.
-        </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link
-            href="/cadastro"
-            className="rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-dark"
-          >
-            Começar teste grátis
-          </Link>
-          <Link
-            href="/login"
-            className="rounded-md border border-line bg-card px-4 py-2.5 text-sm font-medium"
-          >
-            Já tenho conta
-          </Link>
-        </div>
-      </section>
-
-      <section className="border-t border-line bg-card">
-        <div className="mx-auto max-w-5xl px-6 py-12">
-          <h2 className="text-xl font-semibold text-ink">Negócio (MVP)</h2>
-          <p className="mt-1 text-sm text-muted">
-            Trial 14 dias com cartão · faixas por estoque · loja WhatsApp no Pro
-            · Pix+IA no Master
+      <section className="landing-hero" aria-label="Apresentação">
+        <div className="landing-hero__inner">
+          <h1 className="landing-hero__brand">GuerraAcervo</h1>
+          <p className="landing-hero__headline">
+            O sebo no WhatsApp, com catálogo sob controle.
           </p>
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            {negocio.map((plan) => (
-              <article
-                key={plan.code}
-                className="rounded-lg border border-line p-5"
-              >
-                <h3 className="font-semibold text-ink">{plan.name}</h3>
-                <p className="mt-1 text-2xl font-semibold text-accent">
-                  {formatPrice(plan.priceMonthlyBrl)}
-                  <span className="text-sm font-normal text-muted">/mês</span>
-                </p>
-                <p className="mt-2 text-sm text-muted">
-                  {plan.maxBooks === null
-                    ? "Livros ilimitados"
-                    : `Até ${plan.maxBooks.toLocaleString("pt-BR")} livros`}
-                </p>
-                <ul className="mt-4 space-y-1 text-sm text-muted">
-                  {plan.entitlements.map((e) => (
-                    <li key={e}>· {e}</li>
-                  ))}
-                </ul>
-                <Link
-                  href={`/cadastro?plano=${plan.code}`}
-                  className="mt-5 inline-block rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent-dark"
-                >
-                  Começar teste
-                </Link>
-              </article>
-            ))}
+          <p className="landing-hero__lead">
+            Cadastre livros, atenda clientes e venda pelo Zap — 14 dias para
+            testar o plano Negócio.
+          </p>
+          <div className="landing-hero__cta">
+            <a href="#planos" className="landing-btn landing-btn--primary">
+              Começar teste
+            </a>
+            <Link href="/login" className="landing-btn landing-btn--ghost">
+              Já tenho conta
+            </Link>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-5xl px-6 py-12">
-        <h2 className="text-xl font-semibold text-ink">Pessoal (roadmap)</h2>
-        <p className="mt-1 text-sm text-muted">
-          Freemium para colecionadores — construir após o Negócio web
-        </p>
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {pessoal.map((plan) => (
-            <article
-              key={plan.code}
-              className="rounded-lg border border-line bg-card p-4"
-            >
-              <h3 className="font-medium text-ink">{plan.name}</h3>
-              <p className="mt-1 text-lg font-semibold">
-                {formatPrice(plan.priceMonthlyBrl)}
-              </p>
-              <p className="mt-1 text-xs text-muted">
-                {plan.maxBooks === null
-                  ? "Ilimitado"
-                  : `${plan.maxBooks} livros`}
+      <section className="landing-how" aria-labelledby="how-title">
+        <div className="landing-section">
+          <h2 id="how-title" className="landing-section__title">
+            Como funciona
+          </h2>
+          <p className="landing-section__lead">
+            Do cadastro ao atendimento no WhatsApp do sebo, em três passos.
+          </p>
+          <div className="landing-how__steps">
+            <article className="landing-how__step">
+              <p className="landing-how__n">01</p>
+              <h3>Crie a conta</h3>
+              <p>
+                Escolha o plano, confirme seu WhatsApp e inicie o trial com
+                cartão — cobrança só depois dos 14 dias.
               </p>
             </article>
-          ))}
+            <article className="landing-how__step">
+              <p className="landing-how__n">02</p>
+              <h3>Conecte o Zap do sebo</h3>
+              <p>
+                No painel, em Loja, escaneie o QR da Evolution e ligue o número
+                que atende seus clientes.
+              </p>
+            </article>
+            <article className="landing-how__step">
+              <p className="landing-how__n">03</p>
+              <h3>Atenda e venda</h3>
+              <p>
+                O agente consulta o catálogo, sugere títulos e encaminha reservas
+                enquanto você controla estoque e pedidos.
+              </p>
+            </article>
+          </div>
         </div>
       </section>
-    </main>
+
+      <section
+        id="planos"
+        className="landing-plans"
+        aria-labelledby="plans-title"
+      >
+        <div className="landing-section">
+          <h2 id="plans-title" className="landing-section__title">
+            Planos Negócio
+          </h2>
+          <p className="landing-section__lead">
+            Escolha a faixa do estoque. Você pode mudar depois no portal da
+            assinatura.
+          </p>
+          <PlanPicker plans={negocio} defaultPlanCode="business_profissional" />
+        </div>
+      </section>
+
+      <section className="landing-close" aria-labelledby="close-title">
+        <h2 id="close-title" className="landing-section__title">
+          Pronto para abrir o sebo digital?
+        </h2>
+        <p>Trial de 14 dias. Sem compromisso no período de teste.</p>
+        <a href="#planos" className="landing-btn landing-btn--primary">
+          Escolher plano
+        </a>
+      </section>
+
+      <footer className="landing-footer">
+        © {new Date().getFullYear()} GuerraAcervo
+      </footer>
+    </div>
   );
 }

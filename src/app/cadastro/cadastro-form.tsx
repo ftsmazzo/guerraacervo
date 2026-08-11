@@ -122,13 +122,26 @@ export function CadastroForm() {
 
   return (
     <div className="mx-auto max-w-lg px-6 py-12">
-      <Link href="/" className="text-sm text-muted hover:text-ink">
-        ← Voltar
+      <Link
+        href="/#planos"
+        className="text-sm hover:underline"
+        style={{ color: "var(--lp-ink-soft, #78716c)" }}
+      >
+        ← Voltar aos planos
       </Link>
-      <h1 className="mt-4 text-2xl font-semibold text-ink">
+      <h1
+        className="mt-4 text-2xl font-semibold"
+        style={{
+          fontFamily: "var(--font-landing-display), Georgia, serif",
+          color: "var(--lp-ink, #1c1917)",
+        }}
+      >
         Começar teste — Negócio
       </h1>
-      <p className="mt-2 text-sm text-muted">
+      <p
+        className="mt-2 text-sm"
+        style={{ color: "var(--lp-ink-soft, #78716c)" }}
+      >
         14 dias de trial com cartão. Você só é cobrado depois do período de
         teste.
       </p>

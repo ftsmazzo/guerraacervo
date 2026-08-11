@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Fraunces, Inter, Manrope } from "next/font/google";
 import "./globals.css";
 
 const brand = Inter({
@@ -7,9 +7,20 @@ const brand = Inter({
   subsets: ["latin"],
 });
 
+const landingDisplay = Fraunces({
+  variable: "--font-landing-display",
+  subsets: ["latin"],
+});
+
+const landingSans = Manrope({
+  variable: "--font-landing-sans",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   title: "GuerraAcervo",
-  description: "Sistema SaaS para sebos e colecionadores de livros",
+  description:
+    "Sistema para sebos: catálogo, WhatsApp e vendas — planos Negócio com trial de 14 dias.",
 };
 
 export default function RootLayout({
@@ -19,7 +30,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      <body className={`${brand.variable} antialiased`}>{children}</body>
+      <body
+        className={`${brand.variable} ${landingDisplay.variable} ${landingSans.variable} antialiased`}
+      >
+        {children}
+      </body>
     </html>
   );
 }

@@ -1,14 +1,24 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import { CadastroForm } from "./cadastro-form";
+import "@/components/landing/landing.css";
 
 export default function CadastroPage() {
   return (
-    <main className="min-h-screen bg-background">
-      <header className="border-b border-line bg-card px-6 py-4">
-        <p className="text-lg font-semibold text-ink">GuerraAcervo</p>
-        <p className="text-xs text-muted">Cadastro Negócio</p>
+    <main className="landing-funnel">
+      <header className="landing-funnel__header">
+        <Link href="/" className="landing-funnel__brand">
+          GuerraAcervo
+        </Link>
+        <p className="landing-funnel__sub">Cadastro Negócio · trial 14 dias</p>
       </header>
-      <Suspense fallback={<p className="p-6 text-sm text-muted">Carregando…</p>}>
+      <Suspense
+        fallback={
+          <p className="px-6 py-8 text-sm" style={{ color: "var(--lp-ink-soft)" }}>
+            Carregando…
+          </p>
+        }
+      >
         <CadastroForm />
       </Suspense>
     </main>
