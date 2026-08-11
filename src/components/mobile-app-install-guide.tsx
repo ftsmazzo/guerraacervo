@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 function ShareIcon({ className }: { className?: string }) {
   return (
@@ -21,6 +21,25 @@ function ShareIcon({ className }: { className?: string }) {
   );
 }
 
+function MenuDotsIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      width="20"
+      height="20"
+      fill="currentColor"
+      aria-hidden
+    >
+      <circle cx="12" cy="5" r="1.6" />
+      <circle cx="12" cy="12" r="1.6" />
+      <circle cx="12" cy="19" r="1.6" />
+    </svg>
+  );
+}
+
+type PlatformTab = "ios" | "android";
+
 function detect() {
   if (typeof window === "undefined") {
     return { isIos: false, isStandalone: false, isAndroid: false };
@@ -36,12 +55,115 @@ function detect() {
   return { isIos, isStandalone, isAndroid };
 }
 
+function Step({
+  n,
+  title,
+  children,
+}: {
+  n: number;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <li className="flex gap-4 px-5 py-4">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-white">
+        {n}
+      </span>
+      <div>
+        <p className="font-medium text-ink">{title}</p>
+        <div className="mt-1 text-sm text-muted">{children}</div>
+      </div>
+    </li>
+  );
+}
+
+function IosSteps() {
+  return (
+    <>
+      <ol className="divide-y divide-line">
+        <Step n={1} title="Abra este painel no Safari">
+          Não use Instagram, WhatsApp ou Chrome embutido. Copie o link e cole
+          no <strong>Safari</strong>.
+        </Step>
+        <Step n={2} title="Toque em Compartilhar">
+          Na barra de baixo do Safari, toque em{" "}
+          <span className="inline-flex items-center gap-1 rounded border border-line bg-background px-1.5 py-0.5 align-middle text-accent-text">
+            <ShareIcon className="inline" /> Compartilhar
+          </span>{" "}
+          (quadrado com seta para cima).
+        </Step>
+        <Step n={3} title="Adicionar à Tela de Início">
+          Role a lista → <strong>&quot;Adicionar à Tela de Início&quot;</strong>{" "}
+          → Adicionar. Aparece o ícone <strong>GuerraAcervo</strong>.
+        </Step>
+        <Step n={4} title="Abra pelo ícone novo">
+          Saia do Safari e abra pelo ícone (tela cheia, sem barra do Safari).
+          Faça login se pedir.
+        </Step>
+        <Step n={5} title="Ative as notificações">
+          Em <strong>Loja</strong> →{" "}
+          <strong>Ativar alertas neste aparelho</strong> → Permitir.
+        </Step>
+      </ol>
+      <div className="border-t border-line bg-background px-5 py-3 text-xs text-muted">
+        Dica: se não achar a opção, em Compartilhar role até o fim →{" "}
+        &quot;Editar Ações…&quot; e ative &quot;Adicionar à Tela de Início&quot;.
+      </div>
+    </>
+  );
+}
+
+function AndroidSteps() {
+  return (
+    <>
+      <ol className="divide-y divide-line">
+        <Step n={1} title="Abra no Chrome (ou Edge)">
+          Use o navegador completo — não o navegador interno do WhatsApp /
+          Instagram. Cole o link do painel no <strong>Chrome</strong>.
+        </Step>
+        <Step n={2} title="Menu do navegador">
+          Toque nos três pontinhos{" "}
+          <span className="inline-flex items-center gap-1 rounded border border-line bg-background px-1.5 py-0.5 align-middle text-accent-text">
+            <MenuDotsIcon className="inline" /> ⋮
+          </span>{" "}
+          no canto superior direito.
+        </Step>
+        <Step n={3} title="Instalar ou adicionar à tela inicial">
+          Toque em <strong>&quot;Instalar app&quot;</strong> ou{" "}
+          <strong>&quot;Adicionar à tela inicial&quot;</strong> /{" "}
+          <strong>&quot;Instalar página como app&quot;</strong> (o texto muda
+          conforme a versão do Chrome) → Confirmar.
+        </Step>
+        <Step n={4} title="Abra pelo ícone GuerraAcervo">
+          Na tela inicial ou na gaveta de apps, abra o ícone. Deve abrir sem a
+          barra de endereço do Chrome.
+        </Step>
+        <Step n={5} title="Ative as notificações">
+          Em <strong>Loja</strong> →{" "}
+          <strong>Ativar alertas neste aparelho</strong> →{" "}
+          <strong>Permitir</strong>. Se o Android pedir, autorize também em
+          Configurações → Apps → GuerraAcervo → Notificações.
+        </Step>
+      </ol>
+      <div className="border-t border-line bg-background px-5 py-3 text-xs text-muted">
+        Dica Samsung/Xiaomi: se não aparecer &quot;Instalar app&quot;, use
+        &quot;Adicionar à tela inicial&quot;. Em alguns aparelhos o Chrome
+        mostra um banner &quot;Instalar&quot; na barra de endereço — pode
+        usar esse atalho.
+      </div>
+    </>
+  );
+}
+
 export function MobileAppInstallGuide() {
   const [env, setEnv] = useState(detect);
   const [ready, setReady] = useState(false);
+  const [tab, setTab] = useState<PlatformTab>("ios");
 
   useEffect(() => {
-    setEnv(detect());
+    const next = detect();
+    setEnv(next);
+    setTab(next.isAndroid ? "android" : "ios");
     setReady(true);
   }, []);
 
@@ -70,118 +192,48 @@ export function MobileAppInstallGuide() {
     );
   }
 
+  const title =
+    tab === "android" ? "App no celular (Android)" : "App no celular (iPhone)";
+  const lead =
+    tab === "android"
+      ? "No Android, instale o GuerraAcervo pela tela inicial (Chrome) para receber reservas com o painel fechado."
+      : "No iPhone as notificações de reserva só funcionam com o GuerraAcervo na Tela de Início. Siga os passos no Safari.";
+
   return (
     <div
       id="app-celular"
       className="overflow-hidden rounded-lg border border-line bg-card shadow-[var(--shadow)]"
     >
       <div className="border-b border-line bg-accent-soft px-5 py-4">
-        <h3 className="text-base font-semibold text-ink">
-          App no celular (iPhone)
-        </h3>
-        <p className="mt-1 text-sm text-muted">
-          No iPhone as notificações de reserva só funcionam se o GuerraAcervo
-          estiver na <strong>Tela de Início</strong>, como um app. Siga os
-          passos no Safari.
-        </p>
+        <h3 className="text-base font-semibold text-ink">{title}</h3>
+        <p className="mt-1 text-sm text-muted">{lead}</p>
+        <div className="mt-3 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setTab("ios")}
+            className={`min-h-10 rounded-md px-3 py-1.5 text-sm font-medium ${
+              tab === "ios"
+                ? "bg-accent text-white"
+                : "border border-line bg-card text-muted"
+            }`}
+          >
+            iPhone
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("android")}
+            className={`min-h-10 rounded-md px-3 py-1.5 text-sm font-medium ${
+              tab === "android"
+                ? "bg-accent text-white"
+                : "border border-line bg-card text-muted"
+            }`}
+          >
+            Android
+          </button>
+        </div>
       </div>
 
-      <ol className="divide-y divide-line">
-        <li className="flex gap-4 px-5 py-4">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-white">
-            1
-          </span>
-          <div>
-            <p className="font-medium text-ink">Abra este painel no Safari</p>
-            <p className="mt-1 text-sm text-muted">
-              Não use Instagram, WhatsApp ou Chrome embutido. Copie o link e
-              cole no <strong>Safari</strong> (ícone azul da maçã).
-            </p>
-          </div>
-        </li>
-
-        <li className="flex gap-4 px-5 py-4">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-white">
-            2
-          </span>
-          <div>
-            <p className="font-medium text-ink">Toque em Compartilhar</p>
-            <p className="mt-1 text-sm text-muted">
-              Na barra de baixo do Safari, toque no ícone{" "}
-              <span className="inline-flex items-center gap-1 rounded border border-line bg-background px-1.5 py-0.5 align-middle text-accent-text">
-                <ShareIcon className="inline" /> Compartilhar
-              </span>{" "}
-              (quadrado com seta para cima).
-            </p>
-          </div>
-        </li>
-
-        <li className="flex gap-4 px-5 py-4">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-white">
-            3
-          </span>
-          <div>
-            <p className="font-medium text-ink">
-              Adicionar à Tela de Início
-            </p>
-            <p className="mt-1 text-sm text-muted">
-              Role a lista e toque em{" "}
-              <strong>&quot;Adicionar à Tela de Início&quot;</strong> →
-              Adicionar. Vai aparecer o ícone <strong>GuerraAcervo</strong>.
-            </p>
-          </div>
-        </li>
-
-        <li className="flex gap-4 px-5 py-4">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-white">
-            4
-          </span>
-          <div>
-            <p className="font-medium text-ink">Abra pelo ícone novo</p>
-            <p className="mt-1 text-sm text-muted">
-              Saia do Safari. Na tela inicial, toque no ícone GuerraAcervo
-              (abre em tela cheia, sem barra do Safari). Entre com seu login se
-              pedir.
-            </p>
-          </div>
-        </li>
-
-        <li className="flex gap-4 px-5 py-4">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-white">
-            5
-          </span>
-          <div>
-            <p className="font-medium text-ink">Ative as notificações</p>
-            <p className="mt-1 text-sm text-muted">
-              No app, vá em <strong>Loja</strong> (menu de baixo) → toque em{" "}
-              <strong>Ativar alertas neste aparelho</strong> → Permitir.
-            </p>
-          </div>
-        </li>
-      </ol>
-
-      {env.isAndroid ? (
-        <div className="border-t border-line px-5 py-4 text-sm text-muted">
-          <strong className="text-ink">Android:</strong> no Chrome, menu ⋮ →
-          &quot;Adicionar à tela inicial&quot; ou &quot;Instalar app&quot;, depois
-          ative as notificações abaixo.
-        </div>
-      ) : null}
-
-      {!env.isIos && !env.isAndroid ? (
-        <div className="border-t border-line px-5 py-4 text-sm text-muted">
-          Este guia é para iPhone. No computador o banner de reserva e o
-          WhatsApp já avisam; o push é pensado para o celular da prateleira.
-        </div>
-      ) : null}
-
-      {env.isIos ? (
-        <div className="border-t border-line bg-background px-5 py-3 text-xs text-muted">
-          Dica iPhone 13: se não achar &quot;Adicionar à Tela de Início&quot;,
-          no menu Compartilhar role até o fim → &quot;Editar Ações…&quot; e
-          ative essa opção.
-        </div>
-      ) : null}
+      {tab === "ios" ? <IosSteps /> : <AndroidSteps />}
     </div>
   );
 }
