@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { businessPlans } from "@/lib/plans";
 
-type Step = "form" | "otp" | "checkout";
+type Step = "form" | "otp" | "pay" | "pix";
 
 export function CadastroForm() {
   const router = useRouter();
@@ -24,6 +24,13 @@ export function CadastroForm() {
   const [debugCode, setDebugCode] = useState<string | null>(null);
   const [phoneHint, setPhoneHint] = useState("");
   const [otp, setOtp] = useState("");
+  const [pix, setPix] = useState<{
+    txid: string;
+    copiaECola: string;
+    qrImage: string | null;
+    amount: string;
+  } | null>(null);
+  const [pixPaid, setPixPaid] = useState(false);
 
   const [tenantName, setTenantName] = useState("");
   const [ownerName, setOwnerName] = useState("");
@@ -89,8 +96,7 @@ export function CadastroForm() {
         setError(data.error || "Código inválido.");
         return;
       }
-      setStep("checkout");
-      await startCheckout(draftId);
+      setStep("pay");
     } catch {
       setError("Erro ao verificar código.");
     } finally {
@@ -120,6 +126,54 @@ export function CadastroForm() {
     }
   }
 
+  async function startPix(id: string) {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/efi/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draftId: id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.txid) {
+        setError(data.error || "Não foi possível gerar o Pix.");
+        return;
+      }
+      setPix({
+        txid: data.txid as string,
+        copiaECola: (data.copiaECola as string) || "",
+        qrImage: (data.qrImage as string) || null,
+        amount: (data.amount as string) || "",
+      });
+      setPixPaid(false);
+      setStep("pix");
+    } catch {
+      setError("Erro ao gerar Pix.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (step !== "pix" || !pix?.txid || !draftId || pixPaid) return;
+    const t = setInterval(async () => {
+      try {
+        const res = await fetch(
+          `/api/efi/status?txid=${encodeURIComponent(pix.txid)}&draftId=${encodeURIComponent(draftId)}`,
+        );
+        const data = await res.json().catch(() => ({}));
+        if (data.paid) {
+          setPixPaid(true);
+          window.location.href = "/cadastro/sucesso?pago=pix";
+        }
+      } catch {
+        /* poll silencioso */
+      }
+    }, 3000);
+    return () => clearInterval(t);
+  }, [step, pix?.txid, draftId, pixPaid]);
+
   return (
     <div className="mx-auto max-w-lg px-6 py-12">
       <Link
@@ -142,8 +196,7 @@ export function CadastroForm() {
         className="mt-2 text-sm"
         style={{ color: "var(--lp-ink-soft, #78716c)" }}
       >
-        14 dias de trial com cartão. Você só é cobrado depois do período de
-        teste.
+        Cartão: 14 dias de teste. Pix: confirma o primeiro mês agora.
       </p>
       {params.get("cancel") ? (
         <p className="mt-3 rounded-md border border-line bg-card px-3 py-2 text-sm text-muted">
@@ -227,7 +280,7 @@ export function CadastroForm() {
         </form>
       ) : null}
 
-      {step === "otp" || step === "checkout" ? (
+      {step === "otp" ? (
         <form onSubmit={onVerifyOtp} className="mt-8 space-y-4">
           <p className="text-sm text-muted">
             Digite o código enviado para {phoneHint || "seu WhatsApp"}.
@@ -254,7 +307,7 @@ export function CadastroForm() {
             disabled={loading || otp.length < 6}
             className="w-full rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-dark disabled:opacity-60"
           >
-            {loading ? "Aguarde…" : "Confirmar e ir ao pagamento"}
+            {loading ? "Aguarde…" : "Confirmar código"}
           </button>
           <button
             type="button"
@@ -267,17 +320,75 @@ export function CadastroForm() {
           >
             Voltar ao formulário
           </button>
-          {step === "checkout" && draftId ? (
+        </form>
+      ) : null}
+
+      {step === "pay" && draftId ? (
+        <div className="mt-8 space-y-3">
+          <p className="text-sm text-muted">Como quer assinar?</p>
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          <button
+            type="button"
+            disabled={loading}
+            className="w-full rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-dark disabled:opacity-60"
+            onClick={() => startPix(draftId)}
+          >
+            {loading ? "Gerando Pix…" : "Pagar com Pix"}
+          </button>
+          <button
+            type="button"
+            disabled={loading}
+            className="w-full rounded-md border border-line px-4 py-2.5 text-sm font-medium hover:border-accent"
+            onClick={() => startCheckout(draftId)}
+          >
+            Cartão — 14 dias grátis
+          </button>
+        </div>
+      ) : null}
+
+      {step === "pix" && pix ? (
+        <div className="mt-8 space-y-4 text-center">
+          <p className="text-sm text-muted">
+            Escaneie o QR ou copie o código. Valor:{" "}
+            <strong>
+              {Number(pix.amount).toLocaleString("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+              })}
+            </strong>
+          </p>
+          {pix.qrImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={pix.qrImage}
+              alt="QR Code Pix"
+              className="mx-auto h-56 w-56 rounded-lg border border-line bg-white p-2"
+            />
+          ) : null}
+          {pix.copiaECola ? (
             <button
               type="button"
-              disabled={loading}
-              className="w-full rounded-md border border-line px-4 py-2 text-sm"
-              onClick={() => startCheckout(draftId)}
+              className="w-full rounded-md border border-line px-3 py-2 text-left text-xs break-all"
+              onClick={() => void navigator.clipboard.writeText(pix.copiaECola)}
             >
-              Abrir Checkout de novo
+              {pix.copiaECola}
             </button>
           ) : null}
-        </form>
+          <p className="text-xs text-muted">
+            {pixPaid ? "Pix confirmado. Abrindo sua conta…" : "Aguardando pagamento…"}
+          </p>
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          <button
+            type="button"
+            className="text-sm text-muted hover:text-ink"
+            onClick={() => {
+              setStep("pay");
+              setPix(null);
+            }}
+          >
+            Escolher outra forma
+          </button>
+        </div>
       ) : null}
 
       <p className="mt-8 text-center text-sm text-muted">

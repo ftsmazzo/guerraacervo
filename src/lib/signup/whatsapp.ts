@@ -47,9 +47,13 @@ export function welcomeMessage(opts: {
   loginUrl: string;
 }) {
   const first = opts.ownerName.split(" ")[0] || opts.ownerName;
+  const period =
+    opts.trialDays > 0
+      ? `Trial de *${opts.trialDays} dias* ativo.`
+      : `Assinatura *Pix* confirmada.`;
   return (
     `Oi, ${first}! Conta *${opts.tenantName}* criada no GuerraAcervo 📚\n\n` +
-    `Trial de *${opts.trialDays} dias* ativo.\n` +
+    `${period}\n` +
     `Acesse: ${opts.loginUrl}\n\n` +
     `Depois, em *Loja*, conecte o WhatsApp do sebo (QR) para o agente atender seus clientes.`
   );

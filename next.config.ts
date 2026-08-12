@@ -4,6 +4,7 @@ import path from "path";
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname),
+  serverExternalPackages: ["sdk-node-apis-efi"],
   experimental: {
     serverActions: {
       // Capas podem ir como data URL comprimida no formulário

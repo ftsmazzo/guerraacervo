@@ -30,6 +30,7 @@ export type ProvisionTenantInput = {
   status?: "trialing" | "active";
   stripeCustomerId?: string | null;
   stripeSubscriptionId?: string | null;
+  settings?: Record<string, unknown>;
 };
 
 export type ProvisionTenantResult =
@@ -126,6 +127,7 @@ export async function provisionTenantAccount(
         storeEnabled: plan.product === "business",
         stripeCustomerId: input.stripeCustomerId || null,
         stripeSubscriptionId: input.stripeSubscriptionId || null,
+        settings: input.settings || {},
       })
       .returning();
 

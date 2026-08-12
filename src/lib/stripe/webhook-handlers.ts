@@ -2,17 +2,12 @@ import { eq } from "drizzle-orm";
 import type Stripe from "stripe";
 import { db } from "@/db";
 import { tenants } from "@/db/schema";
-import { sendAccessEmail } from "@/lib/signup/email";
+import { notifyNewAccount } from "@/lib/signup/notify";
 import {
   deleteSignupDraft,
   getSignupDraft,
 } from "@/lib/signup/pending";
 import {
-  sendSignupWhatsapp,
-  welcomeMessage,
-} from "@/lib/signup/whatsapp";
-import {
-  appPublicUrl,
   planCodeFromPriceId,
   STRIPE_TRIAL_DAYS,
 } from "@/lib/stripe/client";
@@ -58,31 +53,6 @@ async function findTenantByStripe(opts: {
     if (byCust) return byCust;
   }
   return null;
-}
-
-async function notifyNewAccount(opts: {
-  ownerName: string;
-  ownerEmail: string;
-  ownerWhatsapp: string;
-  tenantName: string;
-  trialDays: number;
-}) {
-  await sendAccessEmail({
-    to: opts.ownerEmail,
-    ownerName: opts.ownerName,
-    tenantName: opts.tenantName,
-    trialDays: opts.trialDays,
-  });
-  const loginUrl = `${appPublicUrl()}/login`;
-  await sendSignupWhatsapp(
-    opts.ownerWhatsapp,
-    welcomeMessage({
-      ownerName: opts.ownerName,
-      tenantName: opts.tenantName,
-      trialDays: opts.trialDays,
-      loginUrl,
-    }),
-  );
 }
 
 export async function handleCheckoutSessionCompleted(
