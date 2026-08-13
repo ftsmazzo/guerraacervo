@@ -35,6 +35,7 @@ const nav: NavItem[] = [
     label: "Loja",
     entitlement: ["store_whatsapp", "store_pix"],
   },
+  { href: "/painel/assinatura", label: "Assinatura" },
 ];
 
 function allowed(

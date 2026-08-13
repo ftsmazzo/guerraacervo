@@ -14,6 +14,26 @@ export async function rememberEfiDraft(txid: string, draftId: string) {
   await redis.set(txKey(txid), draftId, "EX", 60 * 60 * 24);
 }
 
+function tenantTxKey(txid: string) {
+  return `ga:efi:tenant:${txid}`;
+}
+
+export async function rememberEfiTenant(txid: string, tenantId: string) {
+  const redis = getRedis();
+  if (redis.status !== "ready") await redis.connect().catch(() => null);
+  await redis.set(tenantTxKey(txid), tenantId, "EX", 60 * 60 * 24);
+}
+
+export async function tenantIdForTxid(txid: string): Promise<string | null> {
+  try {
+    const redis = getRedis();
+    if (redis.status !== "ready") await redis.connect().catch(() => null);
+    return (await redis.get(tenantTxKey(txid))) || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function draftIdForTxid(txid: string): Promise<string | null> {
   try {
     const redis = getRedis();
