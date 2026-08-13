@@ -16,6 +16,8 @@ function planAmount(planCode: string) {
   const plan = getPlan(planCode);
   const n = plan?.priceMonthlyBrl;
   if (!n || n <= 0) return null;
+  // Homologação Efí só confirma sozinha cobrança até R$ 10.
+  if (process.env.EFI_SANDBOX !== "false") return "1.00";
   return n.toFixed(2);
 }
 
