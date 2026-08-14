@@ -316,7 +316,7 @@ export async function openRouterChat(opts: {
       Authorization: `Bearer ${opts.apiKey}`,
       "Content-Type": "application/json",
       "HTTP-Referer": opts.appUrl,
-      "X-OpenRouter-Title": "GuerraAcervo",
+      "X-OpenRouter-Title": "PrismaBook",
     },
     body: JSON.stringify(body),
   });

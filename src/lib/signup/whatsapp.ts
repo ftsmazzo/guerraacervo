@@ -34,7 +34,7 @@ export async function sendSignupWhatsapp(
 
 export function otpMessage(code: string) {
   return (
-    `*GuerraAcervo* — código de verificação:\n\n` +
+    `*PrismaBook* — código de verificação:\n\n` +
     `*${code}*\n\n` +
     `Válido por 10 minutos. Se você não pediu, ignore.`
   );
@@ -52,7 +52,7 @@ export function welcomeMessage(opts: {
       ? `Trial de *${opts.trialDays} dias* ativo.`
       : `Assinatura *Pix* confirmada.`;
   return (
-    `Oi, ${first}! Conta *${opts.tenantName}* criada no GuerraAcervo 📚\n\n` +
+    `Oi, ${first}! Conta *${opts.tenantName}* criada no PrismaBook 📚\n\n` +
     `${period}\n` +
     `Acesse: ${opts.loginUrl}\n\n` +
     `Depois, em *Loja*, conecte o WhatsApp do sebo (QR) para o agente atender seus clientes.`

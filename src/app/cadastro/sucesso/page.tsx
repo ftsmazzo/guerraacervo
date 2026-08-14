@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function CadastroSucessoPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-16">
-      <p className="text-sm font-medium text-accent-text">GuerraAcervo</p>
+      <p className="text-sm font-medium text-accent-text">PrismaBook</p>
       <h1 className="mt-2 text-2xl font-semibold text-ink">Conta em criação</h1>
       <p className="mt-3 text-sm leading-relaxed text-muted">
         Se o pagamento/trial foi confirmado, provisionamos sua conta em segundos.

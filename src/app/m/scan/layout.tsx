@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Scanner GuerraAcervo",
+  title: "Scanner PrismaBook",
   description: "Leitura de ISBN ou capa para o computador",
   robots: "noindex",
 };

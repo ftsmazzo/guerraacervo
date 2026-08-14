@@ -1,27 +1,75 @@
 @import "tailwindcss";
 
 /* ╔══════════════════════════════════════════════════════╗
-   ║  GuerraAcervo · Design System · Paleta Quente Clara ║
-   ║  Identidade visual — Renato (legado)                 ║
+   ║  PrismaBook · Design System                          ║
+   ║  Navy profundo + espectro (azul, ciano, âmbar)       ║
    ╚══════════════════════════════════════════════════════╝ */
 :root {
-  --background: #f9f7f4;
-  --foreground: #1c1917;
-  --muted: #78716c;
-  --muted-2: #44403c;
+  /* Marca — cores do prisma */
+  --brand-navy: #0b1a2f;
+  --brand-navy-soft: #12304f;
+  --brand-blue: #1d5fa8;
+  --brand-blue-light: #2e7cc9;
+  --brand-teal: #12a5a5;
+  --brand-amber: #f2a33c;
+  --brand-coral: #e8614d;
+  --brand-spectrum: linear-gradient(
+    90deg,
+    var(--brand-navy-soft) 0%,
+    var(--brand-blue) 32%,
+    var(--brand-teal) 62%,
+    var(--brand-amber) 100%
+  );
+
+  /* Neutros — papel frio */
+  --background: #f6f8fb;
+  --foreground: #0b1a2f;
+  --muted: #5d6e85;
+  --muted-2: #334a63;
   --card: #ffffff;
-  --line: #ece5d8;
-  --line-strong: #ddd6ca;
-  --accent: #e67e22;
-  --accent-dark: #c2410c;
-  --accent-soft: #fff3e6;
-  --accent-text: #9a3412;
-  --ink: #1c1917;
-  --sidebar-bg: #ffffff;
-  --sidebar-text: #57534e;
-  --sidebar-hover: #fdf8f3;
+  --line: #e4eaf2;
+  --line-strong: #cfdae7;
+  --ink: #0b1a2f;
+
+  /* Ação primária */
+  --accent: var(--brand-blue);
+  --accent-dark: #164a82;
+  --accent-soft: #e8f1fa;
+  --accent-text: #16456f;
+
+  /* Destaque secundário (âmbar do espectro) */
+  --highlight: var(--brand-amber);
+  --highlight-soft: #fdf3e3;
+  --highlight-text: #8a5200;
+
+  /* Estados */
+  --success: #0f7b54;
+  --success-soft: #e6f5ee;
+  --success-line: #b7e2cd;
+  --success-text: #0b5e40;
+  --warning: #b26a00;
+  --warning-soft: #fdf3e3;
+  --warning-line: #f3d9a8;
+  --warning-text: #8a5200;
+  --danger: #b42318;
+  --danger-soft: #fdecea;
+  --danger-line: #f5c2bc;
+  --danger-text: #8f1d14;
+  --info: var(--brand-blue);
+  --info-soft: #e8f1fa;
+  --info-line: #c4dbf1;
+  --info-text: #16456f;
+
+  /* Sidebar em navy — tokens próprios.
+     --sidebar-hover segue claro: é reaproveitado como superfície sutil
+     no hover de tabelas e em abas de captura. */
+  --sidebar-bg: var(--brand-navy);
+  --sidebar-text: #a8bdd6;
+  --sidebar-line: #1a3453;
+  --sidebar-item-hover: #14304f;
+  --sidebar-hover: #f1f5fa;
   --radius: 8px;
-  --shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  --shadow: 0 1px 4px rgba(11, 26, 47, 0.07);
 }
 
 @theme inline {
@@ -40,6 +88,18 @@
   --color-sidebar-bg: var(--sidebar-bg);
   --color-sidebar-text: var(--sidebar-text);
   --color-sidebar-hover: var(--sidebar-hover);
+  --color-sidebar-line: var(--sidebar-line);
+  --color-sidebar-item-hover: var(--sidebar-item-hover);
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-amber: var(--brand-amber);
+  --color-brand-coral: var(--brand-coral);
+  --color-highlight: var(--highlight);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
   --font-sans: var(--font-brand);
 }
 
@@ -55,6 +115,13 @@ body {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+/* Assinatura da marca — faixa do espectro do prisma */
+.brand-spectrum-bar {
+  height: 3px;
+  background: var(--brand-spectrum);
+  border-radius: 3px 3px 0 0;
 }
 
 /* Painel mobile — touch e overflow */

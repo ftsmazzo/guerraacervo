@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
@@ -76,16 +77,24 @@ export default async function PainelLayout({
   return (
     <div className="painel-shell min-h-screen md:grid md:grid-cols-[230px_1fr]">
       <RegisterPainelServiceWorker />
-      <aside className="hidden border-r border-line bg-sidebar-bg md:block">
-        <div className="flex h-[58px] items-center gap-2.5 border-b border-line px-3.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[7px] bg-accent text-sm font-semibold text-white">
-            G
-          </div>
+      <aside className="hidden border-r border-sidebar-line bg-sidebar-bg md:block">
+        <div className="brand-spectrum-bar" />
+        <div className="flex h-[58px] items-center gap-2.5 border-b border-sidebar-line px-3.5">
+          <Image
+            src="/prismabook-icon.png"
+            alt="PrismaBook"
+            width={32}
+            height={32}
+            className="h-8 w-8 shrink-0 rounded-[7px]"
+            priority
+          />
           <div className="min-w-0">
-            <p className="truncate text-[0.9rem] font-bold text-ink">
-              GuerraAcervo
+            <p className="truncate text-[0.9rem] font-bold text-white">
+              PrismaBook
             </p>
-            <p className="truncate text-[0.62rem] text-muted">Painel do sebo</p>
+            <p className="truncate text-[0.62rem] text-sidebar-text">
+              Painel do sebo
+            </p>
           </div>
         </div>
         <nav className="flex flex-col gap-1 px-2 py-2">
@@ -95,17 +104,17 @@ export default async function PainelLayout({
               <Link
                 key={item.href}
                 href={item.href}
-                className="rounded-md border-l-[3px] border-transparent px-3 py-2 text-[0.835rem] text-sidebar-text hover:bg-sidebar-hover hover:text-ink"
+                className="rounded-md border-l-[3px] border-transparent px-3 py-2 text-[0.835rem] text-sidebar-text hover:border-brand-amber hover:bg-sidebar-item-hover hover:text-white"
               >
                 {item.label}
               </Link>
             ))}
         </nav>
-        <div className="border-t border-line px-5 py-4">
+        <div className="border-t border-sidebar-line px-5 py-4">
           {ctx.user.isPlatformAdmin ? (
             <Link
               href="/admin"
-              className="text-xs text-muted hover:text-accent-text"
+              className="text-xs text-sidebar-text hover:text-white"
             >
               Admin plataforma →
             </Link>

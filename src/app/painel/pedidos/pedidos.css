@@ -1,4 +1,4 @@
-/* Módulo Pedidos — estilo Renato */
+/* Módulo Pedidos — tokens do design system PrismaBook */
 
 .pedidos-page .page-header {
   display: flex;
@@ -85,7 +85,7 @@
 }
 
 .pedidos-page .required-star {
-  color: #dc2626;
+  color: var(--danger);
 }
 
 .pedidos-page .form-label {
@@ -181,7 +181,7 @@
   font-weight: 600;
   color: var(--muted);
   border-bottom: 1px solid var(--line);
-  background: #faf8f5;
+  background: #f4f7fb;
 }
 
 .pedidos-page table.data td {
@@ -216,8 +216,8 @@
   gap: 1.25rem;
   align-items: center;
   padding: 0.85rem 1.1rem;
-  background: linear-gradient(135deg, #fff7ed, #ffedd5);
-  border: 1px solid #fed7aa;
+  background: linear-gradient(135deg, var(--highlight-soft), #fbe9cd);
+  border: 1px solid var(--warning-line);
   border-radius: var(--radius);
   margin-bottom: 1rem;
   position: sticky;
@@ -261,9 +261,9 @@
   margin-bottom: 1rem;
   padding: 0.75rem 1rem;
   border-radius: 6px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-line);
+  color: var(--danger-text);
   font-size: 0.85rem;
 }
 
@@ -271,9 +271,9 @@
   margin-bottom: 1rem;
   padding: 0.75rem 1rem;
   border-radius: 6px;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: #166534;
+  background: var(--success-soft);
+  border: 1px solid var(--success-line);
+  color: var(--success-text);
   font-size: 0.85rem;
 }
 
@@ -322,7 +322,7 @@
   height: 48px;
   object-fit: cover;
   border-radius: 3px;
-  background: #eee;
+  background: #e7edf5;
 }
 
 .pedidos-page .qty-input {
@@ -380,7 +380,7 @@
   position: fixed;
   inset: 0;
   z-index: 80;
-  background: rgba(28, 25, 23, 0.45);
+  background: rgba(11, 26, 47, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;

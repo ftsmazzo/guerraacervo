@@ -94,7 +94,7 @@ function IosSteps() {
         </Step>
         <Step n={3} title="Adicionar à Tela de Início">
           Role a lista → <strong>&quot;Adicionar à Tela de Início&quot;</strong>{" "}
-          → Adicionar. Aparece o ícone <strong>GuerraAcervo</strong>.
+          → Adicionar. Aparece o ícone <strong>PrismaBook</strong>.
         </Step>
         <Step n={4} title="Abra pelo ícone novo">
           Saia do Safari e abra pelo ícone (tela cheia, sem barra do Safari).
@@ -134,7 +134,7 @@ function AndroidSteps() {
           <strong>&quot;Instalar página como app&quot;</strong> (o texto muda
           conforme a versão do Chrome) → Confirmar.
         </Step>
-        <Step n={4} title="Abra pelo ícone GuerraAcervo">
+        <Step n={4} title="Abra pelo ícone PrismaBook">
           Na tela inicial ou na gaveta de apps, abra o ícone. Deve abrir sem a
           barra de endereço do Chrome.
         </Step>
@@ -142,7 +142,7 @@ function AndroidSteps() {
           Em <strong>Loja</strong> →{" "}
           <strong>Ativar alertas neste aparelho</strong> →{" "}
           <strong>Permitir</strong>. Se o Android pedir, autorize também em
-          Configurações → Apps → GuerraAcervo → Notificações.
+          Configurações → Apps → PrismaBook → Notificações.
         </Step>
       </ol>
       <div className="border-t border-line bg-background px-5 py-3 text-xs text-muted">
@@ -196,8 +196,8 @@ export function MobileAppInstallGuide() {
     tab === "android" ? "App no celular (Android)" : "App no celular (iPhone)";
   const lead =
     tab === "android"
-      ? "No Android, instale o GuerraAcervo pela tela inicial (Chrome) para receber reservas com o painel fechado."
-      : "No iPhone as notificações de reserva só funcionam com o GuerraAcervo na Tela de Início. Siga os passos no Safari.";
+      ? "No Android, instale o PrismaBook pela tela inicial (Chrome) para receber reservas com o painel fechado."
+      : "No iPhone as notificações de reserva só funcionam com o PrismaBook na Tela de Início. Siga os passos no Safari.";
 
   return (
     <div

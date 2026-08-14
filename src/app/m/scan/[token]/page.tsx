@@ -254,7 +254,7 @@ export default function MobileScanPage() {
   return (
     <main className="ms-page">
       <header className="ms-header">
-        <strong>GuerraAcervo</strong>
+        <strong>PrismaBook</strong>
         <span>Leitor do celular</span>
       </header>
 

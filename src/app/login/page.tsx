@@ -7,7 +7,7 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center px-6">
       <div className="w-full max-w-md rounded-xl border border-line bg-card p-8 shadow-[var(--shadow)]">
         <Link href="/" className="text-sm text-muted hover:text-ink">
-          ← GuerraAcervo
+          ← PrismaBook
         </Link>
         <h1 className="mt-4 text-2xl font-semibold text-ink">Entrar</h1>
         <p className="mt-2 text-sm text-muted">

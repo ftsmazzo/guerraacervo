@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Inter, Manrope } from "next/font/google";
+import { Inter, Manrope, Outfit } from "next/font/google";
 import "./globals.css";
 
 const brand = Inter({
@@ -7,7 +7,7 @@ const brand = Inter({
   subsets: ["latin"],
 });
 
-const landingDisplay = Fraunces({
+const landingDisplay = Outfit({
   variable: "--font-landing-display",
   subsets: ["latin"],
 });
@@ -18,18 +18,18 @@ const landingSans = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "GuerraAcervo",
+  title: "PrismaBook",
   description:
     "Sistema para sebos: catálogo, WhatsApp e vendas — planos Negócio com trial de 14 dias.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "GuerraAcervo",
+    title: "PrismaBook",
     statusBarStyle: "default",
   },
   icons: {
-    icon: [{ url: "/guerraacervo-icon.png", sizes: "192x192", type: "image/png" }],
-    apple: [{ url: "/guerraacervo-icon.png", sizes: "180x180", type: "image/png" }],
+    icon: [{ url: "/prismabook-icon.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/prismabook-icon.png", sizes: "180x180", type: "image/png" }],
   },
   other: {
     "mobile-web-app-capable": "yes",
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#e67e22",
+  themeColor: "#0b1a2f",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,

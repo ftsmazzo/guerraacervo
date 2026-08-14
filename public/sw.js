@@ -1,4 +1,4 @@
-/* GuerraAcervo painel — service worker (Web Push) */
+/* PrismaBook painel — service worker (Web Push) */
 self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
@@ -9,7 +9,7 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("push", (event) => {
   let data = {
-    title: "GuerraAcervo",
+    title: "PrismaBook",
     body: "Nova notificação",
     url: "/painel",
   };
@@ -24,10 +24,10 @@ self.addEventListener("push", (event) => {
   }
 
   event.waitUntil(
-    self.registration.showNotification(data.title || "GuerraAcervo", {
+    self.registration.showNotification(data.title || "PrismaBook", {
       body: data.body,
-      icon: "/guerraacervo-icon.png",
-      badge: "/guerraacervo-icon.png",
+      icon: "/prismabook-icon.png",
+      badge: "/prismabook-icon.png",
       data: { url: data.url || "/painel" },
       tag: "ga-reservation",
       renotify: true,

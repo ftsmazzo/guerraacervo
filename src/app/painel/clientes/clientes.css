@@ -1,4 +1,4 @@
-/* Estilos do módulo Clientes — alinhados ao Renato / livros */
+/* Estilos do módulo Clientes — tokens do design system PrismaBook */
 
 .clientes-page .page-header {
   display: flex;
@@ -58,12 +58,12 @@
 }
 
 .clientes-page .btn-danger-outline {
-  color: #b91c1c;
-  border-color: #fecaca;
+  color: var(--danger);
+  border-color: var(--danger-line);
 }
 
 .clientes-page .btn-danger-outline:hover {
-  background: #fef2f2;
+  background: var(--danger-soft);
 }
 
 .clientes-page .card {
@@ -94,7 +94,7 @@
 }
 
 .clientes-page .required-star {
-  color: #dc2626;
+  color: var(--danger);
 }
 
 .clientes-page .form-label {
@@ -143,7 +143,7 @@
   border: 1px solid var(--line-strong);
   border-right: none;
   border-radius: 6px 0 0 6px;
-  background: #faf8f5;
+  background: #f4f7fb;
   color: var(--muted);
   font-size: 0.85rem;
 }
@@ -231,7 +231,7 @@
   font-weight: 600;
   color: var(--muted);
   border-bottom: 1px solid var(--line);
-  background: #faf8f5;
+  background: #f4f7fb;
 }
 
 .clientes-page table.data td {
@@ -246,7 +246,7 @@
 }
 
 .clientes-page .wa-link {
-  color: #15803d;
+  color: var(--success);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -262,8 +262,8 @@
   min-width: 1.5rem;
   padding: 0.15rem 0.45rem;
   border-radius: 999px;
-  background: #e7e5e4;
-  color: #44403c;
+  background: #e7edf5;
+  color: var(--muted-2);
   font-size: 0.75rem;
   font-weight: 600;
   text-align: center;
@@ -358,9 +358,9 @@
   margin: 1rem;
   padding: 0.85rem 1rem;
   border-radius: 6px;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  color: #92400e;
+  background: var(--warning-soft);
+  border: 1px solid var(--warning-line);
+  color: var(--warning-text);
   font-size: 0.85rem;
 }
 
@@ -375,9 +375,9 @@
   margin-bottom: 1rem;
   padding: 0.75rem 1rem;
   border-radius: 6px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-line);
+  color: var(--danger-text);
   font-size: 0.85rem;
 }
 

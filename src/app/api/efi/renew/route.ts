@@ -46,7 +46,7 @@ export async function POST() {
       calendario: { expiracao: 60 * 60 },
       valor: { original: amount },
       chave: efiPixKey(),
-      solicitacaoPagador: `GuerraAcervo ${tenant.planCode}`.slice(0, 140),
+      solicitacaoPagador: `PrismaBook ${tenant.planCode}`.slice(0, 140),
       infoAdicionais: [
         { nome: "Sebo", valor: tenant.name.slice(0, 140) },
         { nome: "Plano", valor: tenant.planCode },

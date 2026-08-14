@@ -1,4 +1,4 @@
-# GuerraAcervo SaaS
+# PrismaBook SaaS
 
 Base web multi-tenant para sebos e coleções.
 

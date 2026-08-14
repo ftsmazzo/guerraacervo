@@ -157,7 +157,7 @@ function StatusBadge({ status }: { status: string }) {
     trialing: "bg-accent-soft text-accent-text border-line",
     past_due: "bg-amber-50 text-amber-900 border-amber-200",
     suspended: "bg-red-50 text-red-800 border-red-200",
-    canceled: "bg-stone-100 text-stone-600 border-stone-200",
+    canceled: "bg-background text-muted border-line",
   };
   return (
     <span

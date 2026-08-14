@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { PlanPicker } from "@/components/landing/plan-picker";
 import { businessPlans } from "@/lib/plans";
@@ -9,7 +10,17 @@ export default function HomePage() {
   return (
     <div className="landing">
       <nav className="landing-nav" aria-label="Principal">
-        <span className="landing-nav__brand">GuerraAcervo</span>
+        <span className="landing-nav__brand">
+          <Image
+            src="/prismabook-icon.png"
+            alt=""
+            width={28}
+            height={28}
+            className="landing-nav__mark"
+            priority
+          />
+          PrismaBook
+        </span>
         <Link href="/login" className="landing-nav__link">
           Entrar
         </Link>
@@ -17,7 +28,7 @@ export default function HomePage() {
 
       <section className="landing-hero" aria-label="Apresentação">
         <div className="landing-hero__inner">
-          <h1 className="landing-hero__brand">GuerraAcervo</h1>
+          <h1 className="landing-hero__brand">PrismaBook</h1>
           <p className="landing-hero__headline">
             O sebo no WhatsApp, com catálogo sob controle.
           </p>
@@ -101,7 +112,7 @@ export default function HomePage() {
       </section>
 
       <footer className="landing-footer">
-        © {new Date().getFullYear()} GuerraAcervo
+        © {new Date().getFullYear()} PrismaBook
       </footer>
     </div>
   );

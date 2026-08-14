@@ -1,15 +1,15 @@
 /* Landing marketing — scoped; painel keeps globals.css palette */
 .landing {
-  --lp-ink: #14251c;
-  --lp-ink-soft: #2a4034;
-  --lp-mist: #e8efe9;
-  --lp-paper: #f3f6f3;
-  --lp-line: #c5d4c9;
-  --lp-accent: #2f6b4f;
-  --lp-accent-dark: #1f4a36;
-  --lp-brass: #b08d57;
-  --lp-brass-soft: rgba(176, 141, 87, 0.18);
-  --font-display: var(--font-landing-display), Georgia, serif;
+  --lp-ink: #0b1a2f;
+  --lp-ink-soft: #334a63;
+  --lp-mist: #e7eef7;
+  --lp-paper: #f6f8fb;
+  --lp-line: #cfdae7;
+  --lp-accent: #1d5fa8;
+  --lp-accent-dark: #164a82;
+  --lp-brass: #f2a33c;
+  --lp-brass-soft: rgba(242, 163, 60, 0.2);
+  --font-display: var(--font-landing-display), system-ui, sans-serif;
   --font-body: var(--font-landing-sans), system-ui, sans-serif;
 
   color: var(--lp-ink);
@@ -37,11 +37,20 @@
 }
 
 .landing-nav__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   font-family: var(--font-display);
   font-size: 1.35rem;
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--lp-ink);
+}
+
+.landing-nav__mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
 }
 
 .landing-nav__link {
@@ -66,7 +75,7 @@
   overflow: hidden;
   background:
     radial-gradient(ellipse 80% 60% at 85% 20%, var(--lp-brass-soft), transparent 55%),
-    linear-gradient(165deg, #dfe8e1 0%, var(--lp-mist) 38%, #c8d9ce 100%);
+    linear-gradient(165deg, #e3ecf6 0%, var(--lp-mist) 38%, #ccd9ea 100%);
 }
 
 .landing-hero::before {
@@ -77,8 +86,8 @@
     90deg,
     transparent,
     transparent 48px,
-    rgba(20, 37, 28, 0.035) 48px,
-    rgba(20, 37, 28, 0.035) 49px
+    rgba(11, 26, 47, 0.04) 48px,
+    rgba(11, 26, 47, 0.04) 49px
   );
   pointer-events: none;
   animation: landing-shelves 18s linear infinite;
@@ -92,15 +101,15 @@
   width: min(52vw, 420px);
   height: min(70vh, 560px);
   background:
-    linear-gradient(145deg, transparent 40%, rgba(20, 37, 28, 0.06) 40%),
+    linear-gradient(145deg, transparent 40%, rgba(11, 26, 47, 0.06) 40%),
     repeating-linear-gradient(
       180deg,
-      #2f6b4f 0 12px,
-      #244f3b 12px 14px,
-      #b08d57 14px 16px,
-      #1a3328 16px 28px
+      #1d5fa8 0 12px,
+      #12304f 12px 14px,
+      #f2a33c 14px 16px,
+      #0b1a2f 16px 28px
     );
-  opacity: 0.22;
+  opacity: 0.24;
   border-radius: 4px 0 0 4px;
   transform: rotate(-6deg);
   pointer-events: none;
@@ -177,7 +186,7 @@
 
 .landing-btn--primary {
   background: var(--lp-accent);
-  color: #f7faf7;
+  color: #f7fafd;
 }
 
 .landing-btn--primary:hover {
@@ -335,7 +344,7 @@
 
 .plan-picker__tab[aria-selected="true"] {
   border-color: var(--lp-accent);
-  background: linear-gradient(160deg, #fff 60%, rgba(47, 107, 79, 0.08));
+  background: linear-gradient(160deg, #fff 60%, rgba(29, 95, 168, 0.08));
   box-shadow: inset 0 0 0 1px var(--lp-accent);
 }
 
@@ -470,13 +479,13 @@
 
 /* Cadastro funnel header — mesmo tom da landing */
 .landing-funnel {
-  --lp-ink: #14251c;
-  --lp-ink-soft: #2a4034;
-  --lp-mist: #e8efe9;
-  --lp-paper: #f3f6f3;
-  --lp-line: #c5d4c9;
-  --lp-accent: #2f6b4f;
-  --font-display: var(--font-landing-display), Georgia, serif;
+  --lp-ink: #0b1a2f;
+  --lp-ink-soft: #334a63;
+  --lp-mist: #e7eef7;
+  --lp-paper: #f6f8fb;
+  --lp-line: #cfdae7;
+  --lp-accent: #1d5fa8;
+  --font-display: var(--font-landing-display), system-ui, sans-serif;
   --font-body: var(--font-landing-sans), system-ui, sans-serif;
 
   min-height: 100vh;

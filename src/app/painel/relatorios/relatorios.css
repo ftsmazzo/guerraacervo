@@ -126,28 +126,28 @@
 }
 
 .relatorios-page .kpi-green {
-  background: linear-gradient(135deg, #27ae60, #1e8449);
+  background: linear-gradient(135deg, #12946a, #0b5e40);
 }
 .relatorios-page .kpi-blue {
-  background: linear-gradient(135deg, #2980b9, #1a5276);
+  background: linear-gradient(135deg, var(--brand-blue-light), var(--brand-navy-soft));
 }
 .relatorios-page .kpi-orange {
-  background: linear-gradient(135deg, #e67e22, #c2410c);
+  background: linear-gradient(135deg, var(--brand-amber), #b26a00);
 }
 .relatorios-page .kpi-slate {
-  background: linear-gradient(135deg, #57534e, #292524);
+  background: linear-gradient(135deg, #43607d, var(--brand-navy));
 }
 .relatorios-page .kpi-teal {
-  background: linear-gradient(135deg, #0d9488, #115e59);
+  background: linear-gradient(135deg, var(--brand-teal), #0b6f6f);
 }
 .relatorios-page .kpi-amber {
-  background: linear-gradient(135deg, #d97706, #92400e);
+  background: linear-gradient(135deg, #e08c1e, #8a5200);
 }
 .relatorios-page .kpi-violet {
-  background: linear-gradient(135deg, #7c3aed, #5b21b6);
+  background: linear-gradient(135deg, #4a5bc9, #2b3785);
 }
 .relatorios-page .kpi-rose {
-  background: linear-gradient(135deg, #e11d48, #9f1239);
+  background: linear-gradient(135deg, var(--brand-coral), #a8382a);
 }
 
 .relatorios-page .panel {

@@ -8,7 +8,7 @@ export default function CadastroPage() {
     <main className="landing-funnel">
       <header className="landing-funnel__header">
         <Link href="/" className="landing-funnel__brand">
-          GuerraAcervo
+          PrismaBook
         </Link>
         <p className="landing-funnel__sub">Cadastro Negócio · trial 14 dias</p>
       </header>

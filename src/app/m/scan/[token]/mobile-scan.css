@@ -1,7 +1,7 @@
 .mobile-scan-root {
   min-height: 100dvh;
-  background: #0d1b2a;
-  color: #e8eef4;
+  background: var(--brand-navy, #0b1a2f);
+  color: #e8eef7;
 }
 
 .ms-page {
@@ -24,7 +24,7 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: #e67e22;
+  background: #12946a;
   color: #fff;
   display: flex;
   align-items: center;
@@ -68,8 +68,8 @@
 }
 
 .ms-modes button.active {
-  background: #e67e22;
-  color: #fff;
+  background: var(--brand-amber, #f2a33c);
+  color: var(--brand-navy, #0b1a2f);
 }
 
 .ms-msg {
@@ -79,7 +79,7 @@
 }
 
 .ms-msg.error {
-  color: #fecaca;
+  color: var(--danger-line, #f5c2bc);
 }
 
 .ms-hint {
@@ -123,9 +123,9 @@
   left: 6%;
   right: 6%;
   height: 2px;
-  background: #e67e22;
+  background: var(--brand-amber, #f2a33c);
   top: 50%;
-  box-shadow: 0 0 10px #e67e22;
+  box-shadow: 0 0 10px var(--brand-amber, #f2a33c);
   animation: msScan 1.6s ease-in-out infinite;
 }
 
@@ -164,14 +164,14 @@
 }
 
 .ms-btn.primary {
-  background: #e67e22;
+  background: var(--brand-blue-light, #2e7cc9);
   color: #fff;
   min-width: 10rem;
 }
 
 .ms-btn.ghost {
   background: transparent;
-  color: #e8eef4;
+  color: #e8eef7;
   border: 1px solid rgba(255, 255, 255, 0.25);
 }
 

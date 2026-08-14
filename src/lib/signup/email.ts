@@ -7,7 +7,7 @@ export async function sendAccessEmail(opts: {
   trialDays: number;
 }): Promise<{ ok: true; skipped?: boolean } | { ok: false; error: string }> {
   const loginUrl = `${appPublicUrl()}/login`;
-  const subject = `Acesso GuerraAcervo — ${opts.tenantName}`;
+  const subject = `Acesso PrismaBook — ${opts.tenantName}`;
   const text =
     `Olá, ${opts.ownerName}!\n\n` +
     `Sua conta do sebo "${opts.tenantName}" está pronta.\n` +
@@ -15,11 +15,11 @@ export async function sendAccessEmail(opts: {
     `Entre em: ${loginUrl}\n` +
     `E-mail: ${opts.to}\n` +
     `(Use a senha definida no cadastro.)\n\n` +
-    `Equipe GuerraAcervo\n`;
+    `Equipe PrismaBook\n`;
 
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const from =
-    process.env.EMAIL_FROM?.trim() || "GuerraAcervo <onboarding@resend.dev>";
+    process.env.EMAIL_FROM?.trim() || "PrismaBook <onboarding@resend.dev>";
 
   if (!apiKey) {
     console.info("[signup email] RESEND_API_KEY ausente — e-mail não enviado.", {

@@ -14,7 +14,7 @@ export default async function AdminLayout({
       <header className="border-b border-line bg-card">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-4">
           <div>
-            <p className="text-sm font-semibold text-ink">Admin GuerraAcervo</p>
+            <p className="text-sm font-semibold text-ink">Admin PrismaBook</p>
             <p className="text-xs text-muted">
               {ctx.user.name} · {ctx.user.email}
             </p>
