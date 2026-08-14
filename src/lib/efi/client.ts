@@ -1,4 +1,4 @@
-﻿import EfiPay from "sdk-node-apis-efi";
+import EfiPay from "sdk-node-apis-efi";
 
 export type EfiCharge = {
   txid?: string;
@@ -24,7 +24,7 @@ export async function getEfiPay() {
   if (cached) return cached;
   if (!efiConfigured()) {
     throw new Error(
-      "EfÃ­ nÃ£o configurada (Client ID/Secret, certificado e chave Pix).",
+      "Efí não configurada (Client ID/Secret, certificado e chave Pix).",
     );
   }
   const sandbox = process.env.EFI_SANDBOX !== "false";

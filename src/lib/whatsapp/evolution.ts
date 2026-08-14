@@ -1,4 +1,4 @@
-﻿export type EvolutionConfig = {
+export type EvolutionConfig = {
   baseUrl: string;
   apiKey: string;
   webhookSecret: string;
@@ -125,7 +125,7 @@ export async function setInstanceWebhook(
   });
 }
 
-/** Garante webhook ativo (apÃ³s QR / troca de nÃºmero / reconnect). */
+/** Garante webhook ativo (após QR / troca de número / reconnect). */
 export async function ensureInstanceWebhook(
   cfg: EvolutionConfig,
   instance: string,
@@ -227,11 +227,11 @@ export async function waitForQr(
 }
 
 export function normalizePhone(raw: string): string {
-  // Aceita JID completo (ex.: 5511...@s.whatsapp.net) ou sÃ³ dÃ­gitos
+  // Aceita JID completo (ex.: 5511...@s.whatsapp.net) ou só dígitos
   const local = raw.includes("@") ? raw.split("@")[0] : raw;
   const d = local.replace(/\D/g, "");
   if (!d) return "";
-  // LIDs numÃ©ricos longos (>13) nÃ£o sÃ£o telefone â€” rejeita
+  // LIDs numéricos longos (>13) não são telefone — rejeita
   if (d.length > 13) return "";
   if (d.startsWith("55") && d.length >= 12) return d;
   if (d.length >= 10 && d.length <= 11) return `55${d}`;
