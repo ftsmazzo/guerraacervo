@@ -64,9 +64,9 @@
      --sidebar-hover segue claro: é reaproveitado como superfície sutil
      no hover de tabelas e em abas de captura. */
   --sidebar-bg: var(--brand-navy);
-  --sidebar-text: #a8bdd6;
-  --sidebar-line: #1a3453;
-  --sidebar-item-hover: #14304f;
+  --sidebar-text: #d7e3f2;
+  --sidebar-line: #243b5c;
+  --sidebar-item-hover: #1a3a5c;
   --sidebar-hover: #f1f5fa;
   --radius: 8px;
   --shadow: 0 1px 4px rgba(11, 26, 47, 0.07);

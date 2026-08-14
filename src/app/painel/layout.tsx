@@ -77,7 +77,7 @@ export default async function PainelLayout({
   return (
     <div className="painel-shell min-h-screen md:grid md:grid-cols-[230px_1fr]">
       <RegisterPainelServiceWorker />
-      <aside className="hidden border-r border-sidebar-line bg-sidebar-bg md:block">
+      <aside className="relative z-20 hidden min-h-screen border-r border-sidebar-line bg-sidebar-bg text-[#e8eef7] md:block">
         <div className="brand-spectrum-bar" />
         <div className="flex h-[58px] items-center gap-2.5 border-b border-sidebar-line px-3.5">
           <Image
@@ -92,7 +92,7 @@ export default async function PainelLayout({
             <p className="truncate text-[0.9rem] font-bold text-white">
               PrismaBook
             </p>
-            <p className="truncate text-[0.62rem] text-sidebar-text">
+            <p className="truncate text-[0.62rem] text-[#9eb4ce]">
               Painel do sebo
             </p>
           </div>
@@ -104,7 +104,7 @@ export default async function PainelLayout({
               <Link
                 key={item.href}
                 href={item.href}
-                className="rounded-md border-l-[3px] border-transparent px-3 py-2 text-[0.835rem] text-sidebar-text hover:border-brand-amber hover:bg-sidebar-item-hover hover:text-white"
+                className="rounded-md border-l-[3px] border-transparent px-3 py-2 text-[0.875rem] font-medium text-[#e8eef7] hover:border-brand-amber hover:bg-sidebar-item-hover hover:text-white"
               >
                 {item.label}
               </Link>
@@ -114,7 +114,7 @@ export default async function PainelLayout({
           {ctx.user.isPlatformAdmin ? (
             <Link
               href="/admin"
-              className="text-xs text-sidebar-text hover:text-white"
+              className="text-xs text-[#9eb4ce] hover:text-white"
             >
               Admin plataforma →
             </Link>
@@ -122,7 +122,7 @@ export default async function PainelLayout({
         </div>
       </aside>
 
-      <div className="bg-background pb-20 md:pb-0">
+      <div className="relative z-10 min-w-0 bg-background pb-20 md:pb-0">
         <header className="sticky top-0 z-30 border-b border-line bg-card/95 backdrop-blur">
           <div className="flex min-h-[52px] items-center justify-between gap-3 px-4 py-2 md:h-[58px] md:px-6">
             <div className="min-w-0">
