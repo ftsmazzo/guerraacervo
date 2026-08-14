@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PixCheckoutPanel } from "@/components/pix-checkout-panel";
+import "@/components/landing/landing.css";
 
 type PixCharge = {
   txid: string;
@@ -131,31 +133,15 @@ export function AssinaturaClient({
           </button>
         </div>
         {pix ? (
-          <div className="rounded-lg border border-line bg-card p-4 text-center">
-            <p className="text-sm text-muted">
-              Valor:{" "}
-              <strong>
-                {Number(pix.amount).toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
-              </strong>
-            </p>
-            {pix.qrImage ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={pix.qrImage}
-                alt="QR Pix"
-                className="mx-auto mt-3 h-48 w-48 rounded-md border border-line bg-white p-2"
-              />
-            ) : null}
-            {pix.copiaECola ? (
-              <p className="mt-3 break-all text-xs text-muted">{pix.copiaECola}</p>
-            ) : null}
-            <p className="mt-2 text-xs text-muted">
-              {paid ? "Confirmado." : "Aguardando pagamento…"}
-            </p>
-          </div>
+          <PixCheckoutPanel
+            variant="painel"
+            amount={pix.amount}
+            copiaECola={pix.copiaECola}
+            qrImage={pix.qrImage}
+            paid={paid}
+            paidLabel="Pix confirmado."
+            error={error}
+          />
         ) : null}
       </div>
     );

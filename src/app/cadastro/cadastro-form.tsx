@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { PixCheckoutPanel } from "@/components/pix-checkout-panel";
 import { businessPlans } from "@/lib/plans";
 
 type Step = "form" | "otp" | "pay" | "pix";
@@ -183,21 +184,25 @@ export function CadastroForm() {
       >
         ← Voltar aos planos
       </Link>
-      <h1
-        className="mt-4 text-2xl font-semibold"
-        style={{
-          fontFamily: "var(--font-landing-display), Georgia, serif",
-          color: "var(--lp-ink, #1c1917)",
-        }}
-      >
-        Começar teste — Negócio
-      </h1>
-      <p
-        className="mt-2 text-sm"
-        style={{ color: "var(--lp-ink-soft, #78716c)" }}
-      >
-        Cartão: 14 dias de teste. Pix: confirma o primeiro mês agora.
-      </p>
+      {step !== "pix" ? (
+        <>
+          <h1
+            className="mt-4 text-2xl font-semibold"
+            style={{
+              fontFamily: "var(--font-landing-display), Georgia, serif",
+              color: "var(--lp-ink, #0b1a2f)",
+            }}
+          >
+            Começar teste — PrismaBook
+          </h1>
+          <p
+            className="mt-2 text-sm"
+            style={{ color: "var(--lp-ink-soft, #334a63)" }}
+          >
+            Cartão: 14 dias de teste. Pix: confirma o primeiro mês agora.
+          </p>
+        </>
+      ) : null}
       {params.get("cancel") ? (
         <p className="mt-3 rounded-md border border-line bg-card px-3 py-2 text-sm text-muted">
           Checkout cancelado. Você pode tentar de novo quando quiser.
@@ -347,48 +352,17 @@ export function CadastroForm() {
       ) : null}
 
       {step === "pix" && pix ? (
-        <div className="mt-8 space-y-4 text-center">
-          <p className="text-sm text-muted">
-            Escaneie o QR ou copie o código. Valor:{" "}
-            <strong>
-              {Number(pix.amount).toLocaleString("pt-BR", {
-                style: "currency",
-                currency: "BRL",
-              })}
-            </strong>
-          </p>
-          {pix.qrImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={pix.qrImage}
-              alt="QR Code Pix"
-              className="mx-auto h-56 w-56 rounded-lg border border-line bg-white p-2"
-            />
-          ) : null}
-          {pix.copiaECola ? (
-            <button
-              type="button"
-              className="w-full rounded-md border border-line px-3 py-2 text-left text-xs break-all"
-              onClick={() => void navigator.clipboard.writeText(pix.copiaECola)}
-            >
-              {pix.copiaECola}
-            </button>
-          ) : null}
-          <p className="text-xs text-muted">
-            {pixPaid ? "Pix confirmado. Abrindo sua conta…" : "Aguardando pagamento…"}
-          </p>
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          <button
-            type="button"
-            className="text-sm text-muted hover:text-ink"
-            onClick={() => {
-              setStep("pay");
-              setPix(null);
-            }}
-          >
-            Escolher outra forma
-          </button>
-        </div>
+        <PixCheckoutPanel
+          amount={pix.amount}
+          copiaECola={pix.copiaECola}
+          qrImage={pix.qrImage}
+          paid={pixPaid}
+          error={error}
+          onBack={() => {
+            setStep("pay");
+            setPix(null);
+          }}
+        />
       ) : null}
 
       <p className="mt-8 text-center text-sm text-muted">
