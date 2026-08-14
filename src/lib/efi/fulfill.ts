@@ -17,13 +17,14 @@ import { STRIPE_TRIAL_DAYS } from "@/lib/stripe/client";
 import { provisionTenantAccount } from "@/lib/tenants/provision";
 
 export async function ensureEfiWebhook() {
-  if (await efiWebhookReady()) return;
+  const webhookUrl = efiWebhookUrl();
+  if (await efiWebhookReady(webhookUrl)) return;
   const efi = await getEfiPay();
   await efi.pixConfigWebhook(
     { chave: efiPixKey() },
-    { webhookUrl: efiWebhookUrl() },
+    { webhookUrl },
   );
-  await markEfiWebhookReady();
+  await markEfiWebhookReady(webhookUrl);
 }
 
 async function fulfillEfiRenewal(txid: string, tenantId: string) {
