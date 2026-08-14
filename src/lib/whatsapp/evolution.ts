@@ -1,4 +1,4 @@
-export type EvolutionConfig = {
+﻿export type EvolutionConfig = {
   baseUrl: string;
   apiKey: string;
   webhookSecret: string;
@@ -15,7 +15,7 @@ export function resolveEvolutionConfig(): EvolutionConfig | null {
     webhookSecret: process.env.WHATSAPP_WEBHOOK_SECRET || apiKey,
     appPublicUrl:
       process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-      "https://guerraacervo-app.kxryyk.easypanel.host",
+      "https://prismabook.com.br",
   };
 }
 
@@ -125,7 +125,7 @@ export async function setInstanceWebhook(
   });
 }
 
-/** Garante webhook ativo (após QR / troca de número / reconnect). */
+/** Garante webhook ativo (apÃ³s QR / troca de nÃºmero / reconnect). */
 export async function ensureInstanceWebhook(
   cfg: EvolutionConfig,
   instance: string,
@@ -227,11 +227,11 @@ export async function waitForQr(
 }
 
 export function normalizePhone(raw: string): string {
-  // Aceita JID completo (ex.: 5511...@s.whatsapp.net) ou só dígitos
+  // Aceita JID completo (ex.: 5511...@s.whatsapp.net) ou sÃ³ dÃ­gitos
   const local = raw.includes("@") ? raw.split("@")[0] : raw;
   const d = local.replace(/\D/g, "");
   if (!d) return "";
-  // LIDs numéricos longos (>13) não são telefone — rejeita
+  // LIDs numÃ©ricos longos (>13) nÃ£o sÃ£o telefone â€” rejeita
   if (d.length > 13) return "";
   if (d.startsWith("55") && d.length >= 12) return d;
   if (d.length >= 10 && d.length <= 11) return `55${d}`;

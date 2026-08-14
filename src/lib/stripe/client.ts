@@ -1,4 +1,4 @@
-import Stripe from "stripe";
+﻿import Stripe from "stripe";
 
 export const STRIPE_TRIAL_DAYS = 14;
 
@@ -22,7 +22,7 @@ export function getStripe(): Stripe | null {
 export function appPublicUrl() {
   return (
     process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    "https://guerraacervo-app.kxryyk.easypanel.host"
+    "https://prismabook.com.br"
   );
 }
 

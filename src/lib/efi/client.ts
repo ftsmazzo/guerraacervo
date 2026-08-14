@@ -1,4 +1,4 @@
-import EfiPay from "sdk-node-apis-efi";
+﻿import EfiPay from "sdk-node-apis-efi";
 
 export type EfiCharge = {
   txid?: string;
@@ -24,7 +24,7 @@ export async function getEfiPay() {
   if (cached) return cached;
   if (!efiConfigured()) {
     throw new Error(
-      "Efí não configurada (Client ID/Secret, certificado e chave Pix).",
+      "EfÃ­ nÃ£o configurada (Client ID/Secret, certificado e chave Pix).",
     );
   }
   const sandbox = process.env.EFI_SANDBOX !== "false";
@@ -51,7 +51,7 @@ export function efiWebhookUrl() {
   if (explicit) return explicit;
   const base = (
     process.env.NEXT_PUBLIC_APP_URL ||
-    "https://guerraacervo-app.kxryyk.easypanel.host"
+    "https://prismabook.com.br"
   ).replace(/\/$/, "");
   return `${base}/api/efi/webhook`;
 }

@@ -1,12 +1,12 @@
-import type { BookLookupResult } from "@/lib/isbn/normalize";
+﻿import type { BookLookupResult } from "@/lib/isbn/normalize";
 
 export const OPENROUTER_CHAT_URL =
   "https://openrouter.ai/api/v1/chat/completions";
 
-/** Padrão: visão + custo bom para capa/texto */
+/** PadrÃ£o: visÃ£o + custo bom para capa/texto */
 export const DEFAULT_MODEL = "google/gemini-2.5-flash";
 
-/** Fallbacks: barato → precisão */
+/** Fallbacks: barato â†’ precisÃ£o */
 export const DEFAULT_FALLBACKS = [
   "openai/gpt-4o-mini",
   "openai/gpt-4o",
@@ -19,27 +19,27 @@ export const BOOK_JSON_SCHEMA = {
     type: "object",
     additionalProperties: false,
     properties: {
-      titulo: { type: "string", description: "Título do livro" },
+      titulo: { type: "string", description: "TÃ­tulo do livro" },
       autor: { type: "string" },
       editora: { type: "string" },
       ano: { type: "string", description: "Ano AAAA ou vazio" },
       isbn: {
         type: "string",
         description:
-          "ISBN-13 confirmado (só dígitos) ou string vazia — NUNCA inventar",
+          "ISBN-13 confirmado (sÃ³ dÃ­gitos) ou string vazia â€” NUNCA inventar",
       },
       sinopse: { type: "string" },
       capa: {
         type: "string",
         description:
-          "URL https real de imagem de capa, ou vazio. Nunca URL terminando só com ISBN.",
+          "URL https real de imagem de capa, ou vazio. Nunca URL terminando sÃ³ com ISBN.",
       },
       genero: { type: "string" },
       colecao: {
         type: "string",
-        description: "Coleção/série se houver (ex: Reencontro Literatura)",
+        description: "ColeÃ§Ã£o/sÃ©rie se houver (ex: Reencontro Literatura)",
       },
-      idioma: { type: "string", description: "Ex: Português" },
+      idioma: { type: "string", description: "Ex: PortuguÃªs" },
       paginas: { type: ["integer", "null"] },
       tipoCapa: {
         type: "string",
@@ -53,11 +53,11 @@ export const BOOK_JSON_SCHEMA = {
         type: "array",
         items: { type: "string" },
         description:
-          "6 a 12 tags curtas em português para sebo: gênero, público (infantil/jovem adulto/adulto), temas, época, formato se couber (ex: ficção, distopia, jovem adulto, clássico)",
+          "6 a 12 tags curtas em portuguÃªs para sebo: gÃªnero, pÃºblico (infantil/jovem adulto/adulto), temas, Ã©poca, formato se couber (ex: ficÃ§Ã£o, distopia, jovem adulto, clÃ¡ssico)",
       },
       confianca: {
         type: "number",
-        description: "0 a 1 — certeza da identificação",
+        description: "0 a 1 â€” certeza da identificaÃ§Ã£o",
       },
     },
     required: [
@@ -80,7 +80,7 @@ export const BOOK_JSON_SCHEMA = {
   },
 } as const;
 
-/** Vários livros numa única foto (mesa / pilha). */
+/** VÃ¡rios livros numa Ãºnica foto (mesa / pilha). */
 export const MULTI_BOOK_JSON_SCHEMA = {
   name: "ficha_livros_mesa",
   strict: true,
@@ -90,7 +90,7 @@ export const MULTI_BOOK_JSON_SCHEMA = {
     properties: {
       livros: {
         type: "array",
-        description: "Até 8 livros visíveis na foto (capa ou lombada)",
+        description: "AtÃ© 8 livros visÃ­veis na foto (capa ou lombada)",
         maxItems: 8,
         items: {
           type: "object",
@@ -103,12 +103,12 @@ export const MULTI_BOOK_JSON_SCHEMA = {
             isbn: {
               type: "string",
               description:
-                "ISBN só se legível na foto; senão string vazia — NUNCA inventar",
+                "ISBN sÃ³ se legÃ­vel na foto; senÃ£o string vazia â€” NUNCA inventar",
             },
             sinopse: { type: "string" },
             capa: {
               type: "string",
-              description: "Sempre vazio — capa vem do catálogo depois",
+              description: "Sempre vazio â€” capa vem do catÃ¡logo depois",
             },
             genero: { type: "string" },
             colecao: { type: "string" },
@@ -119,7 +119,7 @@ export const MULTI_BOOK_JSON_SCHEMA = {
             tags: { type: "array", items: { type: "string" } },
             confianca: {
               type: "number",
-              description: "0 a 1 — certeza deste item",
+              description: "0 a 1 â€” certeza deste item",
             },
           },
           required: [
@@ -146,7 +146,7 @@ export const MULTI_BOOK_JSON_SCHEMA = {
   },
 } as const;
 
-/** Passagem 2: só resolver ISBN/peso com busca web aberta */
+/** Passagem 2: sÃ³ resolver ISBN/peso com busca web aberta */
 export const ISBN_LOOKUP_SCHEMA = {
   name: "resolver_isbn",
   strict: true,
@@ -217,7 +217,7 @@ export function resolveOpenRouterConfig() {
 
   const appUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
-    "https://guerraacervo-app.kxryyk.easypanel.host";
+    "https://prismabook.com.br";
 
   return { apiKey, model, fallbacks, webSearch, appUrl };
 }
@@ -239,7 +239,7 @@ export function buildOpenRouterPlugins(
       max_results: opts?.maxResults ?? 5,
       search_prompt:
         opts?.searchPrompt ||
-        "Resultados da web sobre o livro (título, autor, ISBN-13, editora, coleção, peso em gramas, páginas). Prefira edição brasileira. Só use ISBN se aparecer explicitamente na fonte.",
+        "Resultados da web sobre o livro (tÃ­tulo, autor, ISBN-13, editora, coleÃ§Ã£o, peso em gramas, pÃ¡ginas). Prefira ediÃ§Ã£o brasileira. SÃ³ use ISBN se aparecer explicitamente na fonte.",
     };
     if (!opts?.unrestricted) {
       web.include_domains = [
@@ -282,7 +282,7 @@ export async function openRouterChat(opts: {
   };
   /** Schema JSON custom (default BOOK_JSON_SCHEMA). */
   jsonSchema?: unknown;
-  /** Se false, não força json_schema. Default true. */
+  /** Se false, nÃ£o forÃ§a json_schema. Default true. */
   structured?: boolean;
 }): Promise<{
   content: string;
