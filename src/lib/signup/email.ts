@@ -1,5 +1,19 @@
 import { appPublicUrl } from "@/lib/stripe/client";
 
+const SENDER_NAME = "PrismaBook";
+const FALLBACK_SENDER_ADDRESS = "onboarding@resend.dev";
+
+/** O nome do remetente é da marca, então vem do código: EMAIL_FROM entra
+ *  apenas com o endereço, mesmo que traga um nome antigo configurado. */
+function senderFrom(raw: string | undefined): string {
+  const value = raw?.trim();
+  const address =
+    value?.match(/<([^>]+)>/)?.[1]?.trim() ||
+    (value?.includes("@") && !value.includes("<") ? value : "") ||
+    FALLBACK_SENDER_ADDRESS;
+  return `${SENDER_NAME} <${address}>`;
+}
+
 export async function sendAccessEmail(opts: {
   to: string;
   ownerName: string;
@@ -18,8 +32,7 @@ export async function sendAccessEmail(opts: {
     `Equipe PrismaBook\n`;
 
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from =
-    process.env.EMAIL_FROM?.trim() || "PrismaBook <onboarding@resend.dev>";
+  const from = senderFrom(process.env.EMAIL_FROM);
 
   if (!apiKey) {
     console.info("[signup email] RESEND_API_KEY ausente — e-mail não enviado.", {
