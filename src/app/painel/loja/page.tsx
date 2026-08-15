@@ -3,6 +3,7 @@ import { PushAlertsCard } from "@/components/push-enable-button";
 import { MobileAppInstallGuide } from "@/components/mobile-app-install-guide";
 import { getAuthContext, hasEntitlement } from "@/lib/auth/context";
 import { getReservationNotifyWhatsapp } from "@/lib/loja/settings";
+import { publicStoreUrl } from "@/lib/tenants/host";
 import { resolveEvolutionConfig } from "@/lib/whatsapp/evolution";
 import { getWhatsappConnection } from "@/lib/whatsapp/queries";
 import { ReservationNotifyForm } from "./reservation-notify-form";
@@ -25,6 +26,7 @@ export default async function LojaPage() {
   const configured = Boolean(resolveEvolutionConfig());
   const conn = await getWhatsappConnection(ctx.tenant.id);
   const notifyPhone = await getReservationNotifyWhatsapp();
+  const storeUrl = publicStoreUrl(ctx.tenant.slug);
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -35,6 +37,30 @@ export default async function LojaPage() {
       </p>
 
       <div className="mt-6 space-y-8">
+        <section aria-labelledby="vitrine-title">
+          <h2
+            id="vitrine-title"
+            className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted"
+          >
+            Vitrine pública
+          </h2>
+          <div className="rounded-lg border border-line bg-card px-4 py-3">
+            <p className="text-sm text-muted">Endereço do seu sebo na web:</p>
+            <a
+              href={storeUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 block break-all font-mono text-sm font-semibold text-accent-text underline"
+            >
+              {storeUrl}
+            </a>
+            <p className="mt-2 text-xs text-muted">
+              Catálogo com estoque &gt; 0. O botão do WhatsApp usa o número de
+              alerta (passo 2).
+            </p>
+          </div>
+        </section>
+
         <section aria-labelledby="app-title">
           <h2
             id="app-title"
