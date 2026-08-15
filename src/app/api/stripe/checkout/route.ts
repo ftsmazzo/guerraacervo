@@ -72,6 +72,13 @@ export async function POST(req: Request) {
     mode: "subscription",
     customer_email: draft.ownerEmail,
     line_items: [{ price: priceId, quantity: 1 }],
+    branding_settings: {
+      display_name: "PrismaBook",
+      background_color: "#f6f8fb",
+      button_color: "#1d5fa8",
+      border_style: "rounded",
+      font_family: "inter",
+    },
     subscription_data: {
       trial_period_days: STRIPE_TRIAL_DAYS,
       metadata: {
