@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose/jwt/verify";
 import { SESSION_COOKIE } from "@/lib/auth/types";
+import { extractTenantSubdomain } from "@/lib/tenants/host";
 
 async function readEdgeSession(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
@@ -24,9 +25,31 @@ async function readEdgeSession(request: NextRequest) {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const host = request.headers.get("host");
+  const tenantSub = extractTenantSubdomain(host);
+
+  // Subdomínio do sebo → vitrine pública /v/{slug}/...
+  if (tenantSub) {
+    if (
+      pathname.startsWith("/_next") ||
+      pathname.startsWith("/api") ||
+      pathname.startsWith("/v/") ||
+      /\.[a-zA-Z0-9]+$/.test(pathname)
+    ) {
+      const res = NextResponse.next();
+      res.headers.set("x-tenant-subdomain", tenantSub);
+      return res;
+    }
+    const url = request.nextUrl.clone();
+    const rest = pathname === "/" ? "" : pathname;
+    url.pathname = `/v/${tenantSub}${rest}`;
+    const res = NextResponse.rewrite(url);
+    res.headers.set("x-tenant-subdomain", tenantSub);
+    return res;
+  }
+
   const session = await readEdgeSession(request);
 
-  // Scanner mobile via QR — público (auth = token na URL)
   if (pathname.startsWith("/m/scan")) {
     return NextResponse.next();
   }
@@ -64,5 +87,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/painel/:path*", "/admin/:path*", "/login", "/m/:path*"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml|webmanifest)$).*)",
+  ],
 };
