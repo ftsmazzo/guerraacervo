@@ -75,6 +75,15 @@ export function slugCandidatesFromSubdomain(sub: string): string[] {
   return out;
 }
 
+/**
+ * URL pública da vitrine.
+ * Preferimos path no apex (SSL estável). Subdomínio funciona quando o DNS
+ * wildcard + certificado estiverem ok; o middleware já aceita os dois.
+ */
 export function publicStoreUrl(slug: string, rootDomain = getRootDomain()) {
-  return `https://${slug}.${rootDomain}`;
+  const preferSubdomain = process.env.PUBLIC_STORE_SUBDOMAIN === "1";
+  if (preferSubdomain) {
+    return `https://${slug}.${rootDomain}`;
+  }
+  return `https://${rootDomain}/v/${slug}`;
 }
