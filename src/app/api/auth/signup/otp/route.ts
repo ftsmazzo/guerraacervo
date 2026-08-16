@@ -19,6 +19,7 @@ export async function POST(req: Request) {
     ownerWhatsapp?: string;
     planCode?: string;
     slug?: string;
+    referralCode?: string;
   } | null;
 
   if (!body) {
@@ -33,15 +34,22 @@ export async function POST(req: Request) {
     ownerWhatsapp: body.ownerWhatsapp || "",
     planCode: body.planCode || "",
     slug: body.slug,
+    referralCode: body.referralCode,
   });
   if (!built.ok) {
     return NextResponse.json({ error: built.error }, { status: 400 });
   }
 
   const draft = built.draft;
-  if (!draft.tenantName || !draft.ownerName) {
+  if (!draft.ownerName) {
     return NextResponse.json(
-      { error: "Preencha nome do sebo e do responsável." },
+      { error: "Preencha seu nome." },
+      { status: 400 },
+    );
+  }
+  if (!draft.tenantName) {
+    return NextResponse.json(
+      { error: "Preencha o nome da conta." },
       { status: 400 },
     );
   }

@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type Stripe from "stripe";
 import { db } from "@/db";
 import { tenants } from "@/db/schema";
+import { grantReferralRewardOnFirstPayment } from "@/lib/referrals/grant";
 import { notifyNewAccount } from "@/lib/signup/notify";
 import {
   deleteSignupDraft,
@@ -60,18 +61,6 @@ export async function handleCheckoutSessionCompleted(
 ) {
   if (session.mode !== "subscription") return;
 
-  const draftId = session.metadata?.draftId;
-  if (!draftId) {
-    console.warn("[stripe] checkout sem draftId", session.id);
-    return;
-  }
-
-  const draft = await getSignupDraft(draftId);
-  if (!draft) {
-    console.warn("[stripe] draft não encontrado", draftId);
-    return;
-  }
-
   const customerId =
     typeof session.customer === "string"
       ? session.customer
@@ -80,6 +69,45 @@ export async function handleCheckoutSessionCompleted(
     typeof session.subscription === "string"
       ? session.subscription
       : session.subscription?.id;
+
+  const tenantId = session.metadata?.tenantId;
+  if (tenantId) {
+    const [tenant] = await db
+      .select()
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
+    if (!tenant) {
+      console.warn("[stripe] convert sem tenant", tenantId);
+      return;
+    }
+    await db
+      .update(tenants)
+      .set({
+        status: "active",
+        stripeCustomerId: customerId || tenant.stripeCustomerId,
+        stripeSubscriptionId: subscriptionId || tenant.stripeSubscriptionId,
+        trialEndsAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(tenants.id, tenant.id));
+    await grantReferralRewardOnFirstPayment(tenant.id).catch((e) => {
+      console.warn("[stripe] referral", e instanceof Error ? e.message : e);
+    });
+    return;
+  }
+
+  const draftId = session.metadata?.draftId;
+  if (!draftId) {
+    console.warn("[stripe] checkout sem draftId/tenantId", session.id);
+    return;
+  }
+
+  const draft = await getSignupDraft(draftId);
+  if (!draft) {
+    console.warn("[stripe] draft não encontrado", draftId);
+    return;
+  }
 
   const existing = await findTenantByStripe({
     customerId,
@@ -99,7 +127,7 @@ export async function handleCheckoutSessionCompleted(
     ownerWhatsapp: draft.ownerWhatsapp,
     planCode: draft.planCode,
     trialDays: STRIPE_TRIAL_DAYS,
-    status: "trialing",
+    status: "active",
     stripeCustomerId: customerId || null,
     stripeSubscriptionId: subscriptionId || null,
   });
@@ -108,6 +136,13 @@ export async function handleCheckoutSessionCompleted(
     console.error("[stripe] provision falhou", result.error, session.id);
     return;
   }
+
+  const { attachReferralOnSignup } = await import("@/lib/referrals/attach");
+  await attachReferralOnSignup({
+    referredTenantId: result.tenantId,
+    code: draft.referralCode,
+  });
+  await grantReferralRewardOnFirstPayment(result.tenantId).catch(() => null);
 
   await deleteSignupDraft(draftId);
   await notifyNewAccount({
@@ -133,6 +168,12 @@ export async function handleSubscriptionUpdated(sub: Stripe.Subscription) {
     ? planCodeFromPriceId(priceId) || tenant.planCode
     : tenant.planCode;
   const status = mapSubStatus(sub.status);
+  const fromStripe = trialEndsFromSubscription(sub);
+  const trialEndsAt =
+    fromStripe ??
+    (tenant.trialEndsAt && tenant.trialEndsAt.getTime() > Date.now()
+      ? tenant.trialEndsAt
+      : null);
 
   await db
     .update(tenants)
@@ -141,10 +182,16 @@ export async function handleSubscriptionUpdated(sub: Stripe.Subscription) {
       planCode,
       stripeCustomerId: customerId,
       stripeSubscriptionId: sub.id,
-      trialEndsAt: trialEndsFromSubscription(sub),
+      trialEndsAt,
       updatedAt: new Date(),
     })
     .where(eq(tenants.id, tenant.id));
+
+  if (status === "active") {
+    await grantReferralRewardOnFirstPayment(tenant.id).catch((e) => {
+      console.warn("[stripe] referral", e instanceof Error ? e.message : e);
+    });
+  }
 }
 
 export async function handleSubscriptionDeleted(sub: Stripe.Subscription) {

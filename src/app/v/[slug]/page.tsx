@@ -104,7 +104,7 @@ export default async function VitrinePage({
         <div className="vitrine__brand">
           <p className="vitrine__eyebrow">PrismaBook</p>
           <h1 className="vitrine__name">{tenant.name}</h1>
-          <p className="vitrine__host">{tenant.slug}.prismabook.com.br</p>
+          <p className="vitrine__host">prismabook.com.br/v/{tenant.slug}</p>
         </div>
         {hello ? (
           <a className="vitrine__cta" href={hello} target="_blank" rel="noreferrer">

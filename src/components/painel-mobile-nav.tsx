@@ -3,32 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const items = [
-  { href: "/painel", label: "Início", match: (p: string) => p === "/painel" },
-  {
-    href: "/painel/pedidos",
-    label: "Pedidos",
-    match: (p: string) => p.startsWith("/painel/pedidos"),
-  },
-  {
-    href: "/painel/livros",
-    label: "Livros",
-    match: (p: string) => p.startsWith("/painel/livros"),
-  },
-  {
-    href: "/painel/relatorios",
-    label: "Relatórios",
-    match: (p: string) => p.startsWith("/painel/relatorios"),
-  },
-  {
-    href: "/painel/loja#app-celular",
-    label: "Loja",
-    match: (p: string) => p.startsWith("/painel/loja"),
-  },
-] as const;
+export type MobileNavItem = {
+  href: string;
+  label: string;
+};
 
-export function PainelMobileNav() {
+export function PainelMobileNav({ items }: { items: MobileNavItem[] }) {
   const pathname = usePathname() || "/painel";
+  if (!items.length) return null;
+  const cols =
+    items.length >= 5 ? "grid-cols-5" : items.length === 4 ? "grid-cols-4" : "grid-cols-3";
 
   return (
     <nav
@@ -36,9 +20,13 @@ export function PainelMobileNav() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Navegação mobile"
     >
-      <ul className="mx-auto grid max-w-lg grid-cols-5">
+      <ul className={`mx-auto grid max-w-lg ${cols}`}>
         {items.map((item) => {
-          const active = item.match(pathname);
+          const path = item.href.split("#")[0];
+          const active =
+            path === "/painel"
+              ? pathname === "/painel"
+              : pathname.startsWith(path);
           return (
             <li key={item.href}>
               <Link

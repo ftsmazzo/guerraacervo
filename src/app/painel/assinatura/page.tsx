@@ -7,7 +7,7 @@ import {
   billingProviderFromSettings,
   efiPaidAtFromSettings,
 } from "@/lib/billing/provider";
-import { getPlan } from "@/lib/plans";
+import { getPlan, planIsFree } from "@/lib/plans";
 import { AssinaturaClient } from "./assinatura-client";
 
 function money(v: number | null | undefined) {
@@ -81,6 +81,8 @@ export default async function AssinaturaPage() {
         <AssinaturaClient
           billing={resolved}
           hasStripe={Boolean(tenant.stripeCustomerId)}
+          isFree={planIsFree(tenant.planCode)}
+          canPay={(plan?.priceMonthlyBrl ?? 0) > 0}
         />
       </div>
     </div>

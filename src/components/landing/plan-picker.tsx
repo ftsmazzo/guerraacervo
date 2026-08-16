@@ -13,15 +13,22 @@ const ENTITLEMENT_LABELS: Partial<Record<Entitlement, string>> = {
   store_whatsapp: "Loja no WhatsApp",
   store_pix: "Cobrança Pix",
   ai_pricing: "Sugestão de preço com IA",
+  wishlist: "Lista de desejos",
+  export: "Exportar catálogo",
+  stats: "Estatísticas da coleção",
+  share_collection: "Compartilhar coleção",
+  ai_suggestions: "Sugestões com IA",
 };
 
 type Props = {
   plans: PlanDefinition[];
   defaultPlanCode?: string;
+  signupProduct?: "personal" | "business";
 };
 
 function formatPrice(value: number | null) {
   if (value === null) return "Sob consulta";
+  if (value === 0) return "Grátis";
   return value.toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL",
@@ -33,7 +40,11 @@ function stockLabel(plan: PlanDefinition) {
   return `Até ${plan.maxBooks.toLocaleString("pt-BR")} livros`;
 }
 
-export function PlanPicker({ plans, defaultPlanCode }: Props) {
+export function PlanPicker({
+  plans,
+  defaultPlanCode,
+  signupProduct = "business",
+}: Props) {
   const initial =
     plans.find((p) => p.code === defaultPlanCode)?.code ||
     plans.find((p) => p.code === "business_profissional")?.code ||
@@ -54,7 +65,7 @@ export function PlanPicker({ plans, defaultPlanCode }: Props) {
 
   return (
     <div className="plan-picker">
-      <div className="plan-picker__tabs" role="tablist" aria-label="Planos Negócio">
+      <div className="plan-picker__tabs" role="tablist" aria-label="Planos">
         {plans.map((p) => {
           const active = p.code === plan.code;
           return (
@@ -86,7 +97,11 @@ export function PlanPicker({ plans, defaultPlanCode }: Props) {
         <h3 className="plan-picker__detail-title">{plan.name}</h3>
         <p className="plan-picker__detail-price">
           {formatPrice(plan.priceMonthlyBrl)}
-          <span> /mês · trial 14 dias</span>
+          <span>
+            {plan.priceMonthlyBrl
+              ? " /mês · 14 dias grátis, sem cartão"
+              : " · para sempre"}
+          </span>
         </p>
         <ul className="plan-picker__features">
           <li>{stockLabel(plan)}</li>
@@ -96,10 +111,16 @@ export function PlanPicker({ plans, defaultPlanCode }: Props) {
         </ul>
         <div className="plan-picker__cta">
           <Link
-            href={`/cadastro?plano=${plan.code}`}
+            href={
+              signupProduct === "personal"
+                ? `/cadastro?produto=pessoal&plano=${plan.code}`
+                : `/cadastro?plano=${plan.code}`
+            }
             className="landing-btn landing-btn--primary"
           >
-            Começar 14 dias grátis — {plan.name}
+            {plan.priceMonthlyBrl
+              ? `Começar 14 dias grátis — ${plan.name}`
+              : `Começar grátis — ${plan.name}`}
           </Link>
         </div>
       </div>

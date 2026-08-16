@@ -72,10 +72,14 @@ export const tenants = pgTable(
     stripeCustomerId: varchar("stripe_customer_id", { length: 120 }),
     stripeSubscriptionId: varchar("stripe_subscription_id", { length: 120 }),
     storeEnabled: boolean("store_enabled").notNull().default(false),
+    referralCode: varchar("referral_code", { length: 16 }),
     settings: jsonb("settings").$type<Record<string, unknown>>().default({}),
     ...timestamps,
   },
-  (t) => [uniqueIndex("tenants_slug_uidx").on(t.slug)],
+  (t) => [
+    uniqueIndex("tenants_slug_uidx").on(t.slug),
+    uniqueIndex("tenants_referral_code_uidx").on(t.referralCode),
+  ],
 );
 
 export const users = pgTable(
@@ -307,3 +311,58 @@ export const clientInterestTags = pgTable(
     ),
   ],
 );
+
+export const wishItems = pgTable("wish_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  isbn: varchar("isbn", { length: 32 }),
+  title: varchar("title", { length: 300 }).notNull(),
+  author: varchar("author", { length: 200 }),
+  notes: text("notes"),
+  ...timestamps,
+});
+
+export const referralStatusEnum = pgEnum("referral_status", [
+  "signed_up",
+  "paid",
+  "rewarded",
+  "invalid",
+]);
+
+export const referrals = pgTable(
+  "referrals",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    referrerTenantId: uuid("referrer_tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    referredTenantId: uuid("referred_tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    codeUsed: varchar("code_used", { length: 16 }).notNull(),
+    status: referralStatusEnum("status").notNull().default("signed_up"),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("referrals_referred_uidx").on(t.referredTenantId),
+  ],
+);
+
+export const referralCredits = pgTable("referral_credits", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  referralId: uuid("referral_id")
+    .notNull()
+    .references(() => referrals.id, { onDelete: "cascade" }),
+  creditMonths: integer("credit_months").notNull().default(0),
+  creditBrl: numeric("credit_brl", { precision: 12, scale: 2 })
+    .notNull()
+    .default("0"),
+  appliedAt: timestamp("applied_at", { withTimezone: true }),
+  notes: text("notes"),
+  ...timestamps,
+});

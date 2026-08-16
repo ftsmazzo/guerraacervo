@@ -1,11 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { PlanPicker } from "@/components/landing/plan-picker";
-import { businessPlans } from "@/lib/plans";
+import { businessPlans, personalPlans } from "@/lib/plans";
 import "@/components/landing/landing.css";
 
 export default function HomePage() {
   const negocio = businessPlans();
+  const pessoal = personalPlans();
 
   return (
     <div className="landing">
@@ -21,9 +22,17 @@ export default function HomePage() {
           />
           PrismaBook
         </span>
-        <Link href="/login" className="landing-nav__link">
-          Entrar
-        </Link>
+        <div className="flex items-center gap-4">
+          <a href="#para-voce" className="landing-nav__link">
+            Para você
+          </a>
+          <a href="#planos" className="landing-nav__link">
+            Para sebos
+          </a>
+          <Link href="/login" className="landing-nav__link">
+            Entrar
+          </Link>
+        </div>
       </nav>
 
       <section className="landing-hero" aria-label="Apresentação">
@@ -33,16 +42,16 @@ export default function HomePage() {
             O sebo no WhatsApp, com catálogo sob controle.
           </p>
           <p className="landing-hero__lead">
-            Cadastre livros, atenda clientes e venda pelo Zap — 14 dias para
-            testar o plano Negócio.
+            Cadastre livros, atenda clientes e venda pelo Zap — 14 dias grátis,
+            sem cartão, para testar o plano Negócio.
           </p>
           <div className="landing-hero__cta">
             <a href="#planos" className="landing-btn landing-btn--primary">
               Começar teste
             </a>
-            <Link href="/login" className="landing-btn landing-btn--ghost">
-              Já tenho conta
-            </Link>
+            <a href="#para-voce" className="landing-btn landing-btn--ghost">
+              Sou leitor
+            </a>
           </div>
         </div>
       </section>
@@ -60,8 +69,8 @@ export default function HomePage() {
               <p className="landing-how__n">01</p>
               <h3>Crie a conta</h3>
               <p>
-                Escolha o plano, confirme seu WhatsApp e inicie o trial com
-                cartão — cobrança só depois dos 14 dias.
+                Confirme seu WhatsApp e entre no painel. Sem cartão no trial —
+                você assina só depois de usar o sistema.
               </p>
             </article>
             <article className="landing-how__step">
@@ -94,10 +103,31 @@ export default function HomePage() {
             Planos Negócio
           </h2>
           <p className="landing-section__lead">
-            Escolha a faixa do estoque. Você pode mudar depois no portal da
-            assinatura.
+            Escolha a faixa do estoque. 14 dias grátis, sem cartão. Você pode
+            mudar o plano depois em Assinatura.
           </p>
           <PlanPicker plans={negocio} defaultPlanCode="business_profissional" />
+        </div>
+      </section>
+
+      <section
+        id="para-voce"
+        className="landing-how"
+        aria-labelledby="personal-title"
+      >
+        <div className="landing-section">
+          <h2 id="personal-title" className="landing-section__title">
+            Para você
+          </h2>
+          <p className="landing-section__lead">
+            Organize sua biblioteca, registre o que procura e, em breve, receba
+            avisos quando um sebo tiver o livro.
+          </p>
+          <PlanPicker
+            plans={pessoal}
+            defaultPlanCode="personal_biblioteca"
+            signupProduct="personal"
+          />
         </div>
       </section>
 
@@ -105,7 +135,7 @@ export default function HomePage() {
         <h2 id="close-title" className="landing-section__title">
           Pronto para abrir o sebo digital?
         </h2>
-        <p>Trial de 14 dias. Sem compromisso no período de teste.</p>
+        <p>Trial de 14 dias. Sem cartão, sem compromisso no período de teste.</p>
         <a href="#planos" className="landing-btn landing-btn--primary">
           Escolher plano
         </a>

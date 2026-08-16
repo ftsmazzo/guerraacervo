@@ -35,7 +35,7 @@ export const PLANS: Record<string, PlanDefinition> = {
     name: "Grátis",
     priceMonthlyBrl: 0,
     maxBooks: 50,
-    entitlements: ["catalog"],
+    entitlements: ["catalog", "wishlist"],
   },
   personal_biblioteca: {
     code: "personal_biblioteca",
@@ -43,7 +43,8 @@ export const PLANS: Record<string, PlanDefinition> = {
     name: "Biblioteca",
     priceMonthlyBrl: 4.99,
     maxBooks: 100,
-    entitlements: ["catalog", "export"],
+    trialDays: 14,
+    entitlements: ["catalog", "export", "wishlist"],
   },
   personal_colecionador: {
     code: "personal_colecionador",
@@ -51,6 +52,7 @@ export const PLANS: Record<string, PlanDefinition> = {
     name: "Colecionador",
     priceMonthlyBrl: 9.99,
     maxBooks: 500,
+    trialDays: 14,
     entitlements: ["catalog", "export", "stats", "wishlist", "share_collection"],
   },
   personal_premium: {
@@ -59,6 +61,7 @@ export const PLANS: Record<string, PlanDefinition> = {
     name: "Premium",
     priceMonthlyBrl: 19.99,
     maxBooks: null,
+    trialDays: 14,
     entitlements: [
       "catalog",
       "export",
@@ -154,4 +157,15 @@ export function businessPlans() {
 
 export function personalPlans() {
   return Object.values(PLANS).filter((p) => p.product === "personal");
+}
+
+export function isSignupPlanCode(code: string) {
+  const plan = getPlan(code);
+  if (!plan) return false;
+  return plan.code !== "business_trial";
+}
+
+export function planIsFree(code: string) {
+  const plan = getPlan(code);
+  return plan?.priceMonthlyBrl === 0;
 }

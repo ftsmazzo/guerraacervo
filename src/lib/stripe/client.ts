@@ -10,6 +10,14 @@ export const BUSINESS_PLAN_CODES = [
 
 export type BusinessPlanCode = (typeof BUSINESS_PLAN_CODES)[number];
 
+export const PERSONAL_PAID_PLAN_CODES = [
+  "personal_biblioteca",
+  "personal_colecionador",
+  "personal_premium",
+] as const;
+
+export type PersonalPaidPlanCode = (typeof PERSONAL_PAID_PLAN_CODES)[number];
+
 export function getStripe(): Stripe | null {
   const key = process.env.STRIPE_SECRET_KEY?.trim();
   if (!key) return null;
@@ -31,16 +39,22 @@ export function priceIdForPlan(planCode: string): string | null {
     business_essencial: process.env.STRIPE_PRICE_ESSENCIAL,
     business_profissional: process.env.STRIPE_PRICE_PROFISSIONAL,
     business_master: process.env.STRIPE_PRICE_MASTER,
+    personal_biblioteca: process.env.STRIPE_PRICE_BIBLIOTECA,
+    personal_colecionador: process.env.STRIPE_PRICE_COLECIONADOR,
+    personal_premium: process.env.STRIPE_PRICE_PREMIUM,
   };
   const id = map[planCode]?.trim();
   return id || null;
 }
 
-export function planCodeFromPriceId(priceId: string): BusinessPlanCode | null {
-  const pairs: Array<[BusinessPlanCode, string | undefined]> = [
+export function planCodeFromPriceId(priceId: string): string | null {
+  const pairs: Array<[string, string | undefined]> = [
     ["business_essencial", process.env.STRIPE_PRICE_ESSENCIAL],
     ["business_profissional", process.env.STRIPE_PRICE_PROFISSIONAL],
     ["business_master", process.env.STRIPE_PRICE_MASTER],
+    ["personal_biblioteca", process.env.STRIPE_PRICE_BIBLIOTECA],
+    ["personal_colecionador", process.env.STRIPE_PRICE_COLECIONADOR],
+    ["personal_premium", process.env.STRIPE_PRICE_PREMIUM],
   ];
   for (const [code, id] of pairs) {
     if (id?.trim() === priceId) return code;

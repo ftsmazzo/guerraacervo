@@ -1,9 +1,8 @@
 import bcrypt from "bcryptjs";
 import { getRedis } from "@/lib/redis";
-import {
-  isBusinessPlanCode,
-  type BusinessPlanCode,
-} from "@/lib/stripe/client";
+import { getPlan, isSignupPlanCode } from "@/lib/plans";
+import { slugifyTenant } from "@/lib/tenants/provision";
+import { normalizeReferralCode } from "@/lib/referrals/codes";
 
 export type PendingSignup = {
   tenantName: string;
@@ -12,7 +11,8 @@ export type PendingSignup = {
   ownerEmail: string;
   passwordHash: string;
   ownerWhatsapp: string;
-  planCode: BusinessPlanCode;
+  planCode: string;
+  referralCode: string | null;
   otpVerified: boolean;
   createdAt: number;
 };
@@ -106,10 +106,12 @@ export async function buildSignupDraft(input: {
   ownerWhatsapp: string;
   planCode: string;
   slug?: string;
+  referralCode?: string | null;
 }): Promise<{ ok: true; draft: PendingSignup } | { ok: false; error: string }> {
-  if (!isBusinessPlanCode(input.planCode)) {
-    return { ok: false, error: "Escolha um plano Negócio válido." };
+  if (!isSignupPlanCode(input.planCode)) {
+    return { ok: false, error: "Escolha um plano válido." };
   }
+  const plan = getPlan(input.planCode)!;
   const password = input.password.trim();
   if (password.length < 6) {
     return { ok: false, error: "Senha com pelo menos 6 caracteres." };
@@ -118,29 +120,37 @@ export async function buildSignupDraft(input: {
   if (phone.length < 10 || phone.length > 13) {
     return { ok: false, error: "WhatsApp inválido." };
   }
+  const ownerName = input.ownerName.trim();
+  if (!ownerName) {
+    return { ok: false, error: "Informe seu nome." };
+  }
   const passwordHash = await bcrypt.hash(password, 10);
-  const slugBase = (input.slug || input.tenantName)
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 50);
-  const slug = slugBase.startsWith("sebo-")
-    ? slugBase
-    : `sebo-${slugBase || "novo"}`.slice(0, 60);
+  const tenantName =
+    input.tenantName.trim() ||
+    (plan.product === "personal" ? `Biblioteca de ${ownerName}` : "");
+  if (!tenantName) {
+    return { ok: false, error: "Informe o nome do sebo." };
+  }
+
+  let slug = slugifyTenant(input.slug?.trim() || tenantName);
+  if (!slug) {
+    return { ok: false, error: "Identificador inválido." };
+  }
+  if (plan.product === "business" && !slug.startsWith("sebo-")) {
+    slug = `sebo-${slug}`.slice(0, 60);
+  }
 
   return {
     ok: true,
     draft: {
-      tenantName: input.tenantName.trim(),
+      tenantName,
       slug,
-      ownerName: input.ownerName.trim(),
+      ownerName,
       ownerEmail: input.ownerEmail.trim().toLowerCase(),
       passwordHash,
       ownerWhatsapp: phone.startsWith("55") ? phone : `55${phone}`,
       planCode: input.planCode,
+      referralCode: normalizeReferralCode(input.referralCode),
       otpVerified: false,
       createdAt: Date.now(),
     },

@@ -13,6 +13,8 @@ import {
   deleteSignupDraft,
   getSignupDraft,
 } from "@/lib/signup/pending";
+import { attachReferralOnSignup } from "@/lib/referrals/attach";
+import { grantReferralRewardOnFirstPayment } from "@/lib/referrals/grant";
 import { STRIPE_TRIAL_DAYS } from "@/lib/stripe/client";
 import { provisionTenantAccount } from "@/lib/tenants/provision";
 
@@ -48,6 +50,9 @@ async function fulfillEfiRenewal(txid: string, tenantId: string) {
       updatedAt: new Date(),
     })
     .where(eq(tenants.id, tenantId));
+  await grantReferralRewardOnFirstPayment(tenantId).catch((e) => {
+    console.warn("[efi] referral", e instanceof Error ? e.message : e);
+  });
   return { ok: true as const };
 }
 
@@ -95,6 +100,11 @@ export async function fulfillEfiPix(txid: string): Promise<{
   }
 
   await deleteSignupDraft(draftId);
+  await attachReferralOnSignup({
+    referredTenantId: result.tenantId,
+    code: draft.referralCode,
+  });
+  await grantReferralRewardOnFirstPayment(result.tenantId).catch(() => null);
   await notifyNewAccount({
     ownerName: draft.ownerName,
     ownerEmail: draft.ownerEmail,

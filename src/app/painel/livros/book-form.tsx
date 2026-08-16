@@ -145,7 +145,13 @@ export type BookFormInitial = {
 
 type SrcState = "idle" | "searching" | "found" | "notfound";
 
-export function BookForm({ initial }: { initial?: BookFormInitial }) {
+export function BookForm({
+  initial,
+  personal = false,
+}: {
+  initial?: BookFormInitial;
+  personal?: boolean;
+}) {
   const router = useRouter();
   const isEdit = Boolean(initial?.id);
   const pocket = usePocketMode();
@@ -778,13 +784,17 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
           capaUrl: capa,
           genero: genre || null,
           idioma: language || "Português",
-          peso: Number(weight) || (pocket ? 300 : Number(weight)),
-          estado: condition as "Novo" | "Ótimo" | "Bom" | "Regular",
-          tipoCapa: coverType as "Brochura" | "Capa Dura",
-          precoCompra: purchasePrice ? Number(purchasePrice) : null,
-          precoVenda: Number(salePrice),
-          estoque: Number(stock),
-          localizacao: location || null,
+          peso: Number(weight) || 300,
+          estado: (condition || "Bom") as "Novo" | "Ótimo" | "Bom" | "Regular",
+          tipoCapa: (coverType || "Brochura") as "Brochura" | "Capa Dura",
+          precoCompra: personal
+            ? null
+            : purchasePrice
+              ? Number(purchasePrice)
+              : null,
+          precoVenda: personal ? 0 : Number(salePrice),
+          estoque: personal ? 1 : Number(stock),
+          localizacao: personal ? null : location || null,
           tags,
         };
         const result = initial?.id
@@ -1108,6 +1118,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
                     onChange={(e) => setIsbn(e.target.value)}
                   />
                 </div>
+                {personal ? null : (
                 <div>
                   <label className="form-label">Localização no Sebo</label>
                   <input
@@ -1117,6 +1128,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
                     placeholder="Estante A — Prateleira 3"
                   />
                 </div>
+                )}
                 <div className="md:col-span-2">
                   <label className="form-label">
                     Título <span className="required-star">*</span>
@@ -1363,8 +1375,12 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
             )}
 
             <div className="card">
-              <div className="card-header">Preços, Estoque e Físico</div>
+              <div className="card-header">
+                {personal ? "Conservação" : "Preços, Estoque e Físico"}
+              </div>
               <div className="card-body grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                {personal ? null : (
+                  <>
                 <div>
                   <label className="form-label">Preço Compra (R$)</label>
                   <input
@@ -1419,6 +1435,9 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
                     </div>
                   )}
                 </div>
+                </>
+                )}
+                {personal ? null : (
                 <div>
                   <label className="form-label">
                     Peso {!pocket ? <span className="required-star">*</span> : null} (g)
@@ -1438,6 +1457,7 @@ export function BookForm({ initial }: { initial?: BookFormInitial }) {
                       : ""}
                   </div>
                 </div>
+                )}
                 <div>
                   <label className="form-label">Nº de Páginas</label>
                   <input

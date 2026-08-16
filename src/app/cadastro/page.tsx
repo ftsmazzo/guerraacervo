@@ -10,7 +10,9 @@ export default function CadastroPage() {
         <Link href="/" className="landing-funnel__brand">
           PrismaBook
         </Link>
-        <p className="landing-funnel__sub">Cadastro Negócio · trial 14 dias</p>
+        <p className="landing-funnel__sub">
+          Cadastro · 14 dias grátis, sem cartão
+        </p>
       </header>
       <Suspense
         fallback={

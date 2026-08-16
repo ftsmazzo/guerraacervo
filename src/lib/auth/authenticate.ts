@@ -59,3 +59,42 @@ export async function authenticateUser(
 
   return { ok: true, session };
 }
+
+export async function sessionForUser(
+  userId: string,
+): Promise<SessionPayload | null> {
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!user) return null;
+
+  const membershipRows = await db
+    .select({
+      tenant: tenants,
+      role: memberships.role,
+    })
+    .from(memberships)
+    .innerJoin(tenants, eq(memberships.tenantId, tenants.id))
+    .where(eq(memberships.userId, user.id))
+    .limit(10);
+
+  const primary = membershipRows[0];
+  const plan = primary ? getPlan(primary.tenant.planCode) : undefined;
+
+  return {
+    sub: user.id,
+    email: user.email,
+    name: user.name,
+    isPlatformAdmin: user.isPlatformAdmin,
+    tenantId: primary?.tenant.id ?? null,
+    tenantSlug: primary?.tenant.slug ?? null,
+    tenantName: primary?.tenant.name ?? null,
+    planCode: primary?.tenant.planCode ?? null,
+    planName: plan?.name ?? null,
+    role: primary?.role ?? null,
+    tenantStatus: primary?.tenant.status ?? null,
+    trialEndsAt: primary?.tenant.trialEndsAt?.toISOString() ?? null,
+  };
+}

@@ -20,6 +20,7 @@ export default async function EditarLivroPage({
 
   return (
     <BookForm
+      personal={ctx.tenant.product === "personal"}
       initial={{
         id: book.id,
         isbn: book.isbn,

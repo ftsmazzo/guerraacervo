@@ -2,7 +2,8 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { memberships, tenants, users } from "@/db/schema";
-import { getPlan } from "@/lib/plans";
+import { getPlan, planIsFree } from "@/lib/plans";
+import { allocateUniqueReferralCode } from "@/lib/referrals/codes";
 import { STRIPE_TRIAL_DAYS } from "@/lib/stripe/client";
 
 export function slugifyTenant(raw: string) {
@@ -52,7 +53,15 @@ export async function provisionTenantAccount(
   const ownerEmail = input.ownerEmail.trim().toLowerCase();
   const plan = getPlan(input.planCode);
   if (!plan) return { ok: false, error: "Plano inválido." };
-  if (!tenantName) return { ok: false, error: "Nome do sebo obrigatório." };
+  if (!tenantName) {
+    return {
+      ok: false,
+      error:
+        plan.product === "personal"
+          ? "Nome da biblioteca obrigatório."
+          : "Nome do sebo obrigatório.",
+    };
+  }
   if (!ownerName) return { ok: false, error: "Nome do responsável obrigatório." };
   if (!ownerEmail || !ownerEmail.includes("@")) {
     return { ok: false, error: "E-mail inválido." };
@@ -91,6 +100,8 @@ export async function provisionTenantAccount(
     return { ok: false, error: `Slug "${slug}" já está em uso.` };
   }
 
+  const wantsTrial =
+    !planIsFree(plan.code) && (input.status ?? "trialing") === "trialing";
   const trialDays = Math.max(
     1,
     Math.min(
@@ -100,7 +111,10 @@ export async function provisionTenantAccount(
   );
   const trialEnds = new Date();
   trialEnds.setDate(trialEnds.getDate() + trialDays);
-  const status = input.status ?? "trialing";
+  const status = planIsFree(plan.code)
+    ? "active"
+    : (input.status ?? "trialing");
+  const referralCode = await allocateUniqueReferralCode();
 
   try {
     const [user] = await db
@@ -123,10 +137,11 @@ export async function provisionTenantAccount(
         product: plan.product,
         planCode: plan.code,
         status,
-        trialEndsAt: status === "trialing" ? trialEnds : null,
+        trialEndsAt: wantsTrial ? trialEnds : null,
         storeEnabled: plan.product === "business",
         stripeCustomerId: input.stripeCustomerId || null,
         stripeSubscriptionId: input.stripeSubscriptionId || null,
+        referralCode,
         settings: input.settings || {},
       })
       .returning();

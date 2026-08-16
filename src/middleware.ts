@@ -68,7 +68,9 @@ export async function middleware(request: NextRequest) {
       login.searchParams.set("next", pathname);
       return NextResponse.redirect(login);
     }
-    return NextResponse.next();
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-pathname", pathname);
+    return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
   if (pathname.startsWith("/admin")) {

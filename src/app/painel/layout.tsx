@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
 import { ManageSubscriptionButton } from "@/components/manage-subscription-button";
@@ -24,6 +25,7 @@ type NavItem = {
 const nav: NavItem[] = [
   { href: "/painel", label: "Dashboard" },
   { href: "/painel/livros", label: "Livros", entitlement: "catalog" },
+  { href: "/painel/desejos", label: "Desejos", entitlement: "wishlist" },
   { href: "/painel/clientes", label: "Clientes", entitlement: "clients" },
   { href: "/painel/pedidos", label: "Pedidos", entitlement: "orders" },
   {
@@ -36,6 +38,7 @@ const nav: NavItem[] = [
     label: "Loja",
     entitlement: ["store_whatsapp", "store_pix"],
   },
+  { href: "/painel/indique", label: "Indique e ganhe" },
   { href: "/painel/assinatura", label: "Assinatura" },
 ];
 
@@ -68,11 +71,30 @@ export default async function PainelLayout({
   if (!ctx) redirect("/login?next=/painel");
 
   const planCode = ctx.tenant?.planCode;
+  const isPersonal = ctx.tenant?.product === "personal";
   const access = ctx.tenant ? tenantAccessOk(ctx.tenant) : { ok: true };
   const trial = ctx.tenant
     ? trialLabel(ctx.tenant.trialEndsAt, ctx.tenant.status)
     : null;
-  const alerts = ctx.tenant ? await listTenantAlerts(ctx.tenant.id, 5) : [];
+  const alerts =
+    ctx.tenant && !isPersonal ? await listTenantAlerts(ctx.tenant.id, 5) : [];
+  const pathname = (await headers()).get("x-pathname") || "";
+  const billingOpen = pathname.startsWith("/painel/assinatura");
+  const visibleNav = nav.filter((item) => allowed(planCode, item.entitlement));
+  const mobileNav = isPersonal
+    ? [
+        { href: "/painel", label: "Início" },
+        { href: "/painel/livros", label: "Livros" },
+        { href: "/painel/desejos", label: "Desejos" },
+        { href: "/painel/assinatura", label: "Plano" },
+      ]
+    : [
+        { href: "/painel", label: "Início" },
+        { href: "/painel/pedidos", label: "Pedidos" },
+        { href: "/painel/livros", label: "Livros" },
+        { href: "/painel/relatorios", label: "Relatórios" },
+        { href: "/painel/loja#app-celular", label: "Loja" },
+      ];
 
   return (
     <div className="painel-shell min-h-screen md:grid md:grid-cols-[230px_1fr]">
@@ -93,14 +115,12 @@ export default async function PainelLayout({
               PrismaBook
             </p>
             <p className="truncate text-[0.62rem] text-[#9eb4ce]">
-              Painel do sebo
+              {isPersonal ? "Sua biblioteca" : "Painel do sebo"}
             </p>
           </div>
         </div>
         <nav className="flex flex-col gap-1 px-2 py-2">
-          {nav
-            .filter((item) => allowed(planCode, item.entitlement))
-            .map((item) => (
+          {visibleNav.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -130,7 +150,9 @@ export default async function PainelLayout({
                 {ctx.tenant?.name ?? "Sem tenant"}
               </p>
               <p className="truncate text-xs text-muted">
-                <span className="md:hidden">Reservas · </span>
+                <span className="md:hidden">
+                  {isPersonal ? "Biblioteca · " : "Reservas · "}
+                </span>
                 Plano: {ctx.tenant?.planName ?? "—"}
                 {trial ? ` · trial · ${trial}` : null}
               </p>
@@ -145,7 +167,7 @@ export default async function PainelLayout({
               <LogoutButton className="text-sm text-muted hover:text-ink" />
             </div>
           </div>
-          {ctx.tenant && access.ok ? (
+          {ctx.tenant && access.ok && !isPersonal ? (
             <div className="border-t border-line px-4 py-2 md:hidden">
               <PushAlertsCard variant="compact" />
             </div>
@@ -155,28 +177,28 @@ export default async function PainelLayout({
         {trial && access.ok ? (
           <div className="border-b border-line bg-accent-soft px-4 py-2.5 text-sm text-accent-text md:px-6 md:py-3">
             Período de teste: {trial}.{" "}
-            <span className="text-muted">
-              Use &quot;Gerenciar assinatura&quot; no PC para cartão ou
-              cancelamento.
-            </span>
+            <Link href="/painel/assinatura" className="underline">
+              Assinar sem perder o acesso
+            </Link>
+            <span className="text-muted"> — sem cartão agora; cobrança só se quiser continuar.</span>
           </div>
         ) : null}
         {access.ok && alerts.length ? (
           <ReservationAlertsBanner alerts={alerts} />
         ) : null}
-        {!access.ok ? (
+        {!access.ok && !billingOpen ? (
           <div className="px-4 py-10 md:px-6">
             <div className="max-w-lg rounded-lg border border-line bg-card p-6">
               <h2 className="text-lg font-semibold text-ink">Acesso bloqueado</h2>
               <p className="mt-2 text-sm text-muted">{access.reason}</p>
               <div className="mt-4 flex flex-wrap gap-3">
-                <ManageSubscriptionButton />
                 <Link
-                  href="/cadastro"
-                  className="text-sm text-accent-text underline"
+                  href="/painel/assinatura"
+                  className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white"
                 >
-                  Novo cadastro
+                  Escolher pagamento
                 </Link>
+                <ManageSubscriptionButton />
               </div>
             </div>
           </div>
@@ -185,7 +207,7 @@ export default async function PainelLayout({
         )}
       </div>
 
-      <PainelMobileNav />
+      <PainelMobileNav items={mobileNav} />
     </div>
   );
 }

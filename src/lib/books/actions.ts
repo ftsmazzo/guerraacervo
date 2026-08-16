@@ -51,6 +51,19 @@ export type BookActionResult =
   | { ok: true; id: string }
   | { ok: false; error: string; errors?: string[] };
 
+const personalBookInputSchema = bookInputSchema.extend({
+  peso: z.coerce.number().int().positive().optional().default(300),
+  estado: z.enum(CONDITIONS).optional().default("Bom"),
+  precoVenda: z.coerce.number().nonnegative().optional().default(0),
+  estoque: z.coerce.number().int().min(0).optional().default(1),
+});
+
+function parseBookInput(input: unknown, product: string) {
+  return product === "personal"
+    ? personalBookInputSchema.safeParse(input)
+    : bookInputSchema.safeParse(input);
+}
+
 function normalizeTags(raw: string[]): string[] {
   return [
     ...new Set(
@@ -105,7 +118,7 @@ function toDbValues(data: BookInput, tenantId: string) {
     coverUrl: data.capaUrl?.trim() || null,
     genre: data.genero?.trim() || null,
     language: data.idioma || "Português",
-    weightGrams: data.peso,
+    weightGrams: data.peso ?? 300,
     condition: data.estado,
     coverType: data.tipoCapa,
     purchasePrice:
@@ -128,7 +141,7 @@ export async function createBook(
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 
-  const parsed = bookInputSchema.safeParse(input);
+  const parsed = parseBookInput(input, ctx.tenant.product);
   if (!parsed.success) {
     const errors = parsed.error.issues.map((i) => i.message);
     return {
@@ -153,6 +166,7 @@ export async function createBook(
       .returning({ id: books.id });
     await syncBookTags(ctx.tenant.id, row.id, tagNames);
     revalidatePath("/painel/livros");
+    if (ctx.tenant.product === "business") {
     try {
       const { enqueueNewBookNotice } = await import("@/lib/whatsapp/notify");
       await enqueueNewBookNotice({
@@ -165,6 +179,7 @@ export async function createBook(
       });
     } catch {
       // notificação não bloqueia cadastro
+    }
     }
     return { ok: true, id: row.id };
   } catch (e) {
@@ -192,7 +207,7 @@ export async function updateBook(
 
   if (!id) return { ok: false, error: "ID inválido." };
 
-  const parsed = bookInputSchema.safeParse(input);
+  const parsed = parseBookInput(input, ctx.tenant.product);
   if (!parsed.success) {
     const errors = parsed.error.issues.map((i) => i.message);
     return {

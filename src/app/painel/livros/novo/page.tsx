@@ -10,5 +10,5 @@ export default async function NovoLivroPage() {
     redirect("/painel/livros");
   }
 
-  return <BookForm />;
+  return <BookForm personal={ctx.tenant.product === "personal"} />;
 }

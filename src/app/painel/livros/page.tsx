@@ -81,6 +81,8 @@ export default async function LivrosPage({
     );
   }
 
+  const isPersonal = ctx.tenant.product === "personal";
+
   const sp = await searchParams;
   const busca = sp.busca?.trim() || "";
   const estado = sp.estado || "";
@@ -310,10 +312,14 @@ export default async function LivrosPage({
                   <th>Estado</th>
                   <th>Tipo</th>
                   <th className="text-center">Pág.</th>
-                  <th className="text-end">Preço Venda</th>
-                  <th className="text-center">Estoque</th>
-                  <th className="text-center">Disponível</th>
-                  <th>Localização</th>
+                  {isPersonal ? null : (
+                    <>
+                      <th className="text-end">Preço Venda</th>
+                      <th className="text-center">Estoque</th>
+                      <th className="text-center">Disponível</th>
+                      <th>Localização</th>
+                    </>
+                  )}
                   <th className="text-center">Ações</th>
                 </tr>
               </thead>
@@ -321,7 +327,7 @@ export default async function LivrosPage({
                 {!livros.length ? (
                   <tr>
                     <td
-                      colSpan={12}
+                      colSpan={isPersonal ? 8 : 12}
                       className="py-10 text-center text-muted"
                     >
                       Nenhum livro encontrado.
@@ -391,6 +397,8 @@ export default async function LivrosPage({
                       <td className="text-center text-muted">
                         {l.pages ?? "—"}
                       </td>
+                      {isPersonal ? null : (
+                        <>
                       <td className="text-end fw-semibold">
                         {money(l.salePrice)}
                       </td>
@@ -417,6 +425,8 @@ export default async function LivrosPage({
                         )}
                       </td>
                       <td className="text-muted">{l.location || "—"}</td>
+                        </>
+                      )}
                       <td className="text-center">
                         <Link
                           href={`/painel/livros/${l.id}`}
