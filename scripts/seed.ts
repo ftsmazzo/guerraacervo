@@ -26,55 +26,22 @@ async function main() {
     console.log("User já existe:", email);
   }
 
-  let [tenant] = await db
-    .select()
+  const [demo] = await db
+    .select({ id: tenants.id })
     .from(tenants)
     .where(eq(tenants.slug, tenantSlug));
 
-  if (!tenant) {
-    const trialEnds = new Date();
-    trialEnds.setDate(trialEnds.getDate() + 7);
-    [tenant] = await db
-      .insert(tenants)
-      .values({
-        name: "Sebo Demo",
-        slug: tenantSlug,
-        product: "business",
-        planCode: "business_trial",
-        status: "trialing",
-        trialEndsAt: trialEnds,
-        storeEnabled: true,
-      })
-      .returning();
-    console.log("Tenant criado:", tenantSlug);
-  } else {
-    console.log("Tenant já existe:", tenantSlug);
-  }
-
-  const [membership] = await db
-    .select()
-    .from(memberships)
-    .where(
-      and(
-        eq(memberships.tenantId, tenant.id),
-        eq(memberships.userId, admin.id),
-      ),
-    );
-
-  if (!membership) {
-    await db.insert(memberships).values({
-      tenantId: tenant.id,
-      userId: admin.id,
-      role: "owner",
-    });
-    console.log("Membership criada");
-  } else {
-    console.log("Membership já existe");
+  if (demo) {
+    await db
+      .delete(memberships)
+      .where(
+        and(eq(memberships.tenantId, demo.id), eq(memberships.userId, admin.id)),
+      );
   }
 
   console.log("Seed OK");
   console.log("  Admin:", email, "/", password);
-  console.log("  Tenant:", tenant.slug, `(${tenant.planCode})`);
+  console.log("  /admin não exige sebo vinculado");
 }
 
 main()

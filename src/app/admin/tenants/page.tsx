@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { CreateTenantForm } from "@/app/admin/tenants/create-tenant-form";
+import { DeleteTenantButton } from "@/app/admin/tenants/delete-tenant-button";
 import { db } from "@/db";
 import { books, memberships, tenants, users } from "@/db/schema";
 import { requirePlatformAdmin } from "@/lib/auth/guards";
@@ -93,7 +94,7 @@ export default async function AdminTenantsPage({
               <th className="px-4 py-3 font-medium">Trial</th>
               <th className="px-4 py-3 font-medium">Livros</th>
               <th className="px-4 py-3 font-medium">Owner</th>
-              <th className="px-4 py-3 font-medium" />
+              <th className="px-4 py-3 font-medium">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -126,13 +127,18 @@ export default async function AdminTenantsPage({
                       "—"
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
                     <Link
                       href={`/admin/tenants/${tenant.id}`}
                       className="text-accent-text hover:underline"
                     >
                       Gerenciar
                     </Link>
+                    <span className="mx-2 text-line">·</span>
+                    <DeleteTenantButton
+                      tenantId={tenant.id}
+                      tenantName={tenant.name}
+                    />
                   </td>
                 </tr>
               );

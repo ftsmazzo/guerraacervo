@@ -65,51 +65,25 @@ async function seed(sql) {
     console.log("[bootstrap] user já existe:", email);
   }
 
-  let [tenant] = await sql`
-    select id, slug, plan_code from tenants where slug = ${tenantSlug} limit 1
+  // Admin da plataforma não deve ser owner de sebo. O acesso a /admin
+  // depende só de is_platform_admin — sem tenant.
+  const unlinked = await sql`
+    delete from memberships
+    where user_id = ${admin.id}
+      and tenant_id in (select id from tenants where slug = ${tenantSlug})
+    returning id
   `;
-
-  if (!tenant) {
-    const trialEnds = new Date();
-    trialEnds.setDate(trialEnds.getDate() + 7);
-    [tenant] = await sql`
-      insert into tenants (
-        name, slug, product, plan_code, status, trial_ends_at, store_enabled
-      ) values (
-        ${"Sebo Demo"},
-        ${tenantSlug},
-        ${"business"},
-        ${"business_trial"},
-        ${"trialing"},
-        ${trialEnds.toISOString()},
-        ${true}
-      )
-      returning id, slug, plan_code
-    `;
-    console.log("[bootstrap] tenant criado:", tenantSlug);
-  } else {
-    console.log("[bootstrap] tenant já existe:", tenantSlug);
-  }
-
-  const [membership] = await sql`
-    select id from memberships
-    where tenant_id = ${tenant.id} and user_id = ${admin.id}
-    limit 1
-  `;
-
-  if (!membership) {
-    await sql`
-      insert into memberships (tenant_id, user_id, role)
-      values (${tenant.id}, ${admin.id}, ${"owner"})
-    `;
-    console.log("[bootstrap] membership owner vinculada");
-  } else {
-    console.log("[bootstrap] membership já existe");
+  if (unlinked.length) {
+    console.log(
+      "[bootstrap] admin desvinculado de",
+      tenantSlug,
+      `(${unlinked.length})`,
+    );
   }
 
   console.log("[bootstrap] Seed OK");
   console.log("  Admin:", email, "/", password);
-  console.log("  Tenant:", tenant.slug, `(${tenant.plan_code})`);
+  console.log("  /admin não exige sebo vinculado");
 }
 
 async function main() {

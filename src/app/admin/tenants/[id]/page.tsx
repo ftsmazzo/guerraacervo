@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { books, memberships, tenants, users } from "@/db/schema";
 import { requirePlatformAdmin } from "@/lib/auth/guards";
 import { getPlan, PLANS } from "@/lib/plans";
+import { DeleteTenantButton } from "@/app/admin/tenants/delete-tenant-button";
 import { TenantActionsForm } from "./tenant-actions-form";
 
 export default async function AdminTenantDetailPage({
@@ -105,6 +106,21 @@ export default async function AdminTenantDetailPage({
               </li>
             ))}
           </ul>
+
+          <div className="mt-6 border-t border-line pt-4">
+            <p className="text-sm font-semibold text-ink">Zona de perigo</p>
+            <p className="mt-1 text-xs text-muted">
+              Remove a conta e tudo o que está ligado a ela. Usuários que só
+              existem neste sebo também são apagados.
+            </p>
+            <div className="mt-3">
+              <DeleteTenantButton
+                tenantId={tenant.id}
+                tenantName={tenant.name}
+                redirectToList
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>

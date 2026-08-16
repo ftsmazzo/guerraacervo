@@ -41,9 +41,11 @@ export default async function AdminLayout({
             >
               Indicações
             </Link>
-            <Link href="/painel" className="text-muted hover:text-ink">
-              Painel sebo
-            </Link>
+            {ctx.tenant ? (
+              <Link href="/painel" className="text-muted hover:text-ink">
+                Painel sebo
+              </Link>
+            ) : null}
             <LogoutButton className="text-muted hover:text-ink" />
           </nav>
         </div>

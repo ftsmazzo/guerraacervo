@@ -1,13 +1,28 @@
 "use server";
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { tenants } from "@/db/schema";
+import {
+  memberships,
+  orderItems,
+  orders,
+  tenants,
+  users,
+  whatsappConnections,
+} from "@/db/schema";
 import { getAuthContext } from "@/lib/auth/context";
 import { requirePlatformAdmin } from "@/lib/auth/guards";
 import { getPlan, PLANS } from "@/lib/plans";
+import { getRedis } from "@/lib/redis";
+import { getStripe } from "@/lib/stripe/client";
 import { provisionTenantAccount } from "@/lib/tenants/provision";
+import {
+  deleteInstance,
+  instanceNameForSlug,
+  logoutInstance,
+  resolveEvolutionConfig,
+} from "@/lib/whatsapp/evolution";
 
 const STATUSES = [
   "trialing",
@@ -142,6 +157,100 @@ export async function extendTrial(tenantId: string, days: number) {
     .where(eq(tenants.id, tenantId));
   revalidatePath("/admin");
   revalidatePath(`/admin/tenants/${tenantId}`);
+}
+
+export type DeleteTenantResult = { ok: true } | { ok: false; error: string };
+
+/** Apaga a conta e dados ligados (livros, pedidos, clientes, WhatsApp, users órfãos). */
+export async function deleteTenantAccount(
+  tenantId: string,
+): Promise<DeleteTenantResult> {
+  await requirePlatformAdmin();
+  if (!/^[0-9a-f-]{36}$/i.test(tenantId)) {
+    return { ok: false, error: "Conta inválida." };
+  }
+
+  const [tenant] = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  if (!tenant) return { ok: false, error: "Conta não encontrada." };
+
+  const memberRows = await db
+    .select({ userId: memberships.userId })
+    .from(memberships)
+    .where(eq(memberships.tenantId, tenantId));
+  const memberUserIds = [...new Set(memberRows.map((m) => m.userId))];
+
+  const [wa] = await db
+    .select({ instanceName: whatsappConnections.instanceName })
+    .from(whatsappConnections)
+    .where(eq(whatsappConnections.tenantId, tenantId))
+    .limit(1);
+
+  const cfg = resolveEvolutionConfig();
+  if (cfg) {
+    const instance = wa?.instanceName || instanceNameForSlug(tenant.slug);
+    await logoutInstance(cfg, instance).catch(() => null);
+    await deleteInstance(cfg, instance).catch(() => null);
+  }
+
+  const stripe = getStripe();
+  if (stripe && tenant.stripeSubscriptionId) {
+    await stripe.subscriptions
+      .cancel(tenant.stripeSubscriptionId)
+      .catch(() => null);
+  }
+
+  try {
+    const redis = getRedis();
+    if (redis.status !== "ready") await redis.connect().catch(() => null);
+    await redis.del(`ga:tenant:${tenantId}:push_subs`).catch(() => null);
+    await redis.del(`ga:tenant:${tenantId}:alerts`).catch(() => null);
+  } catch {
+    // Redis opcional na exclusão
+  }
+
+  try {
+    await db.transaction(async (tx) => {
+      const tenantOrders = await tx
+        .select({ id: orders.id })
+        .from(orders)
+        .where(eq(orders.tenantId, tenantId));
+      const orderIds = tenantOrders.map((o) => o.id);
+      if (orderIds.length) {
+        await tx
+          .delete(orderItems)
+          .where(inArray(orderItems.orderId, orderIds));
+        await tx.delete(orders).where(inArray(orders.id, orderIds));
+      }
+
+      await tx.delete(tenants).where(eq(tenants.id, tenantId));
+
+      for (const userId of memberUserIds) {
+        const [stillMember] = await tx
+          .select({ id: memberships.id })
+          .from(memberships)
+          .where(eq(memberships.userId, userId))
+          .limit(1);
+        if (stillMember) continue;
+        await tx
+          .delete(users)
+          .where(
+            and(eq(users.id, userId), eq(users.isPlatformAdmin, false)),
+          );
+      }
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: `Falha ao excluir: ${msg}` };
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/tenants");
+  revalidatePath(`/admin/tenants/${tenantId}`);
+  return { ok: true };
 }
 
 export async function getAdminStats() {
