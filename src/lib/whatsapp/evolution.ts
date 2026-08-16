@@ -34,8 +34,10 @@ async function evoFetch(
   path: string,
   init?: RequestInit,
 ) {
+  const timeoutMs = 12_000;
   const res = await fetch(`${cfg.baseUrl}${path}`, {
     ...init,
+    signal: init?.signal ?? AbortSignal.timeout(timeoutMs),
     headers: {
       "Content-Type": "application/json",
       apikey: cfg.apiKey,
@@ -151,8 +153,30 @@ export async function sendTextMessage(
     body: JSON.stringify({
       number: digits,
       text,
+      delay: 0,
     }),
   });
+}
+
+/** "Digitando…" no WhatsApp enquanto a IA pensa. */
+export async function sendComposing(
+  cfg: EvolutionConfig,
+  instance: string,
+  number: string,
+) {
+  const digits = number.replace(/\D/g, "");
+  try {
+    await evoFetch(cfg, `/chat/sendPresence/${encodeURIComponent(instance)}`, {
+      method: "POST",
+      body: JSON.stringify({
+        number: digits,
+        delay: 800,
+        presence: "composing",
+      }),
+    });
+  } catch {
+    // ignore — presença é só UX
+  }
 }
 
 export function extractQrBase64(payload: unknown): string | null {

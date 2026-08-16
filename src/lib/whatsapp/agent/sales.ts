@@ -12,10 +12,7 @@ import {
 } from "@/lib/whatsapp/agent/debounce";
 import {
   INTENT_JSON_SCHEMA,
-  SELLER_REPLY_JSON_SCHEMA,
-  THEME_EXPAND_JSON_SCHEMA,
   buildSalesSystemPrompt,
-  buildSellerReplySystemPrompt,
   type SalesIntent,
 } from "@/lib/whatsapp/agent/prompts";
 import { createOrderInternal } from "@/lib/whatsapp/agent/reserve";
@@ -197,10 +194,11 @@ async function classifyIntent(
     const { content } = await openRouterChat({
       apiKey: cfg.apiKey,
       appUrl: cfg.appUrl,
-      model: cfg.model,
-      fallbacks: cfg.fallbacks,
+      model: cfg.agentModel,
+      fallbacks: [],
       webSearch: false,
       temperature: 0,
+      timeoutMs: 6_000,
       jsonSchema: INTENT_JSON_SCHEMA,
       messages: [
         {
@@ -330,38 +328,8 @@ async function doReserve(opts: {
   );
 }
 
-async function expandThemes(focus: string): Promise<string[]> {
-  const cfg = resolveOpenRouterConfig();
-  if (!cfg.apiKey || focus.trim().length < 2) return [];
-  try {
-    const { content } = await openRouterChat({
-      apiKey: cfg.apiKey,
-      appUrl: cfg.appUrl,
-      model: cfg.model,
-      fallbacks: cfg.fallbacks,
-      webSearch: false,
-      temperature: 0.2,
-      jsonSchema: THEME_EXPAND_JSON_SCHEMA,
-      messages: [
-        {
-          role: "system",
-          content:
-            "Dado um autor ou tema literário, devolva termos curtos em português para buscar livros SEMELHANTES num sebo (gênero, temas centrais, público). Não invente títulos.",
-        },
-        {
-          role: "user",
-          content: `Autor/tema: ${focus}`,
-        },
-      ],
-    });
-    const parsed = JSON.parse(content) as { themes?: string[] };
-    return (parsed.themes || [])
-      .map((t) => String(t).trim())
-      .filter((t) => t.length >= 3)
-      .slice(0, 6);
-  } catch {
-    return [];
-  }
+async function expandThemes(_focus: string): Promise<string[]> {
+  return [];
 }
 
 async function findSimilarHits(opts: {
@@ -471,70 +439,7 @@ async function composeSellerReply(opts: {
   hits: CatalogHit[];
   budgetNote?: string;
 }): Promise<string> {
-  const fallback = fallbackSellerReply(opts);
-  const cfg = resolveOpenRouterConfig();
-  if (!cfg.apiKey || opts.mode === "chitchat") return fallback;
-  if (!opts.hits.length && opts.mode !== "empty") return fallback;
-
-  try {
-    const catalog = opts.hits.map((h, i) => ({
-      n: i + 1,
-      title: h.title,
-      author: h.author,
-      price: money(h.salePrice),
-      condition: h.condition,
-      hook: hookLine(h),
-      tags: h.tags.slice(0, 5),
-    }));
-    const { content } = await openRouterChat({
-      apiKey: cfg.apiKey,
-      appUrl: cfg.appUrl,
-      model: cfg.model,
-      fallbacks: cfg.fallbacks,
-      webSearch: false,
-      temperature: 0.55,
-      jsonSchema: SELLER_REPLY_JSON_SCHEMA,
-      messages: [
-        {
-          role: "system",
-          content: buildSellerReplySystemPrompt(opts.seboName),
-        },
-        {
-          role: "user",
-          content: JSON.stringify(
-            {
-              cliente: opts.firstName || null,
-              pedido_do_cliente: opts.userText,
-              foco: opts.focus || null,
-              situacao: opts.mode,
-              nota_orcamento: opts.budgetNote || null,
-              regra_orcamento:
-                opts.mode === "over_budget"
-                  ? "Os livros EXISTEM, mas passam da faixa de preço do cliente. Mostre-os com transparência e ofereça reservar ou buscar dentro da faixa."
-                  : "Se houver nota_orcamento, mencione de leve.",
-              livros_permitidos: catalog,
-              regra:
-                "Só cite livros de livros_permitidos. Numere 1..n. Não invente. Mensagem curta de WhatsApp.",
-            },
-            null,
-            2,
-          ),
-        },
-      ],
-    });
-    const parsed = JSON.parse(content) as { message?: string };
-    const msg = (parsed.message || "").trim();
-    if (msg.length < 20) return fallback;
-    if (opts.hits.length) {
-      const ok = opts.hits.some((h) =>
-        msg.toLowerCase().includes(h.title.toLowerCase().slice(0, 18)),
-      );
-      if (!ok) return fallback;
-    }
-    return msg;
-  } catch {
-    return fallback;
-  }
+  return fallbackSellerReply(opts);
 }
 
 export async function runSalesAgent(opts: {

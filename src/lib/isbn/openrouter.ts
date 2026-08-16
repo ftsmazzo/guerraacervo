@@ -219,7 +219,10 @@ export function resolveOpenRouterConfig() {
     process.env.NEXT_PUBLIC_APP_URL ||
     "https://prismabook.com.br";
 
-  return { apiKey, model, fallbacks, webSearch, appUrl };
+  const agentModel =
+    process.env.OPENROUTER_AGENT_MODEL?.trim() || "openai/gpt-4o-mini";
+
+  return { apiKey, model, fallbacks, webSearch, appUrl, agentModel };
 }
 
 export function buildOpenRouterPlugins(
@@ -284,6 +287,8 @@ export async function openRouterChat(opts: {
   jsonSchema?: unknown;
   /** Se false, não força json_schema. Default true. */
   structured?: boolean;
+  /** Timeout da chamada (ms). ISBN precisa mais; o agente WhatsApp precisa ser curto. */
+  timeoutMs?: number;
 }): Promise<{
   content: string;
   modelUsed: string;
@@ -312,6 +317,7 @@ export async function openRouterChat(opts: {
 
   const r = await fetch(OPENROUTER_CHAT_URL, {
     method: "POST",
+    signal: AbortSignal.timeout(opts.timeoutMs ?? 20_000),
     headers: {
       Authorization: `Bearer ${opts.apiKey}`,
       "Content-Type": "application/json",

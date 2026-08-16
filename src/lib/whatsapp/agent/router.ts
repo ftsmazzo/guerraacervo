@@ -9,6 +9,7 @@ import { runSalesAgent } from "@/lib/whatsapp/agent/sales";
 import {
   normalizePhone,
   resolveEvolutionConfig,
+  sendComposing,
   sendTextMessage,
 } from "@/lib/whatsapp/evolution";
 import { softColdReply } from "@/lib/whatsapp/invite";
@@ -52,6 +53,8 @@ export async function handleInboundMessage(opts: {
     console.warn("[whatsapp] telefone inválido/LID sem alt:", opts.remoteJid);
     return;
   }
+
+  void sendComposing(cfg, conn.instanceName, phone);
 
   const client = await findClientByWhatsapp(conn.tenantId, phone);
   if (!client) {

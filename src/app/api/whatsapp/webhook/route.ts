@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { db } from "@/db";
 import { whatsappConnections } from "@/db/schema";
 import {
@@ -181,6 +181,13 @@ export async function POST(request: Request) {
           ? (data.messages as Record<string, unknown>[])
           : [data];
 
+      const jobs: Array<{
+        instanceName: string;
+        remoteJid: string;
+        text: string;
+        pushName?: string;
+      }> = [];
+
       for (const m of messages) {
         const key = (m.key || {}) as {
           fromMe?: boolean;
@@ -218,16 +225,19 @@ export async function POST(request: Request) {
           });
           continue;
         }
-        try {
-          await handleInboundMessage({
-            instanceName,
-            remoteJid,
-            text,
-            pushName,
-          });
-        } catch (err) {
-          console.error("[whatsapp webhook] handler", err);
-        }
+        jobs.push({ instanceName, remoteJid, text, pushName });
+      }
+
+      if (jobs.length) {
+        after(async () => {
+          for (const job of jobs) {
+            try {
+              await handleInboundMessage(job);
+            } catch (err) {
+              console.error("[whatsapp webhook] handler", err);
+            }
+          }
+        });
       }
     }
   } catch (e) {
