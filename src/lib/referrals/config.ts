@@ -1,6 +1,7 @@
 /**
- * Tabela de prêmios de indicação — placeholders até fechar com o Renato.
- * Só altera valores aqui; o motor em grant.ts lê esta config.
+ * Tabela de prêmios de indicação (defaults).
+ * O admin altera em /admin/indicacoes; o que vale em produção
+ * está em platform_settings.referral_rewards.
  */
 export type ReferralRewardRule =
   | {
@@ -14,15 +15,45 @@ export type ReferralRewardRule =
       stackUntilFree: boolean;
     };
 
-export type ReferralRewardConfig = {
-  userRefersBusiness: ReferralRewardRule;
-  businessRefersUser: ReferralRewardRule;
-  businessRefersBusiness: ReferralRewardRule;
-  userRefersUser: ReferralRewardRule;
-};
+export type ReferralRewardScenario =
+  | "userRefersBusiness"
+  | "businessRefersUser"
+  | "businessRefersBusiness"
+  | "userRefersUser";
+
+export type ReferralRewardConfig = Record<
+  ReferralRewardScenario,
+  ReferralRewardRule
+>;
+
+export const REFERRAL_SCENARIOS: {
+  key: ReferralRewardScenario;
+  label: string;
+  hint: string;
+}[] = [
+  {
+    key: "userRefersBusiness",
+    label: "Leitor indica sebo",
+    hint: "Ex.: plano de R$ 4,99 indica sebo de R$ 249,90 → meses = piso da divisão, limitado ao teto.",
+  },
+  {
+    key: "businessRefersUser",
+    label: "Sebo indica leitor",
+    hint: "Crédito em R$ igual à mensalidade de quem pagou, acumulando até zerar a fatura.",
+  },
+  {
+    key: "businessRefersBusiness",
+    label: "Sebo indica sebo",
+    hint: "Crédito em R$ igual à mensalidade do sebo indicado.",
+  },
+  {
+    key: "userRefersUser",
+    label: "Leitor indica leitor",
+    hint: "Meses grátis = piso (preço do indicado ÷ preço de quem indicou), limitado ao teto.",
+  },
+];
 
 export const REFERRAL_REWARDS: ReferralRewardConfig = {
-  // Ex.: 4,99 indica sebo 249,90 → floor(249.9/4.99)=50 → teto 12 meses
   userRefersBusiness: {
     type: "months",
     formula: "floor_ratio",
@@ -47,3 +78,36 @@ export const REFERRAL_REWARDS: ReferralRewardConfig = {
 
 export const REFERRAL_CODE_LENGTH = 8;
 export const REFERRAL_COOKIE = "pb_ref";
+export const REFERRAL_SETTINGS_KEY = "referral_rewards";
+
+export function parseRewardRule(raw: unknown): ReferralRewardRule | null {
+  if (!raw || typeof raw !== "object") return null;
+  const rule = raw as Record<string, unknown>;
+  if (rule.type === "brl") {
+    return {
+      type: "brl",
+      equalToReferredMonthly: true,
+      stackUntilFree: rule.stackUntilFree !== false,
+    };
+  }
+  if (rule.type === "months") {
+    const cap = Math.floor(Number(rule.capMonths));
+    return {
+      type: "months",
+      formula: "floor_ratio",
+      capMonths: Number.isFinite(cap) ? Math.max(1, Math.min(60, cap)) : 1,
+    };
+  }
+  return null;
+}
+
+export function parseRewardConfig(raw: unknown): ReferralRewardConfig {
+  const src =
+    raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const next = { ...REFERRAL_REWARDS };
+  for (const { key } of REFERRAL_SCENARIOS) {
+    const parsed = parseRewardRule(src[key]);
+    if (parsed) next[key] = parsed;
+  }
+  return next;
+}

@@ -366,3 +366,11 @@ export const referralCredits = pgTable("referral_credits", {
   notes: text("notes"),
   ...timestamps,
 });
+
+export const platformSettings = pgTable("platform_settings", {
+  key: varchar("key", { length: 80 }).primaryKey(),
+  value: jsonb("value").$type<Record<string, unknown>>().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});

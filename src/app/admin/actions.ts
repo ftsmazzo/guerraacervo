@@ -17,6 +17,8 @@ import { getPlan, PLANS } from "@/lib/plans";
 import { getRedis } from "@/lib/redis";
 import { getStripe } from "@/lib/stripe/client";
 import { provisionTenantAccount } from "@/lib/tenants/provision";
+import { parseRewardConfig } from "@/lib/referrals/config";
+import { saveReferralRewards } from "@/lib/referrals/settings";
 import {
   deleteInstance,
   instanceNameForSlug,
@@ -272,4 +274,65 @@ export async function getAdminStats() {
     suspended: map.suspended ?? 0,
     canceled: map.canceled ?? 0,
   };
+}
+
+export type SaveReferralRewardsResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export async function saveReferralRewardConfig(input: {
+  userRefersBusinessType: "months" | "brl";
+  userRefersBusinessCap: number;
+  businessRefersUserType: "months" | "brl";
+  businessRefersUserCap: number;
+  businessRefersBusinessType: "months" | "brl";
+  businessRefersBusinessCap: number;
+  userRefersUserType: "months" | "brl";
+  userRefersUserCap: number;
+}): Promise<SaveReferralRewardsResult> {
+  await requirePlatformAdmin();
+
+  function rule(type: "months" | "brl", cap: number) {
+    if (type === "brl") {
+      return {
+        type: "brl" as const,
+        equalToReferredMonthly: true as const,
+        stackUntilFree: true,
+      };
+    }
+    return {
+      type: "months" as const,
+      formula: "floor_ratio" as const,
+      capMonths: cap,
+    };
+  }
+
+  const config = parseRewardConfig({
+    userRefersBusiness: rule(
+      input.userRefersBusinessType,
+      input.userRefersBusinessCap,
+    ),
+    businessRefersUser: rule(
+      input.businessRefersUserType,
+      input.businessRefersUserCap,
+    ),
+    businessRefersBusiness: rule(
+      input.businessRefersBusinessType,
+      input.businessRefersBusinessCap,
+    ),
+    userRefersUser: rule(input.userRefersUserType, input.userRefersUserCap),
+  });
+
+  try {
+    await saveReferralRewards(config);
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Falha ao salvar.",
+    };
+  }
+
+  revalidatePath("/admin/indicacoes");
+  revalidatePath("/painel/indique");
+  return { ok: true };
 }

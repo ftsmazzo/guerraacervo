@@ -2,22 +2,24 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { referralCredits, referrals, tenants } from "@/db/schema";
 import { getPlan } from "@/lib/plans";
-import { REFERRAL_REWARDS } from "@/lib/referrals/config";
+import type { ReferralRewardConfig } from "@/lib/referrals/config";
+import { loadReferralRewards } from "@/lib/referrals/settings";
 
 function pickRule(
+  rewards: ReferralRewardConfig,
   referrerProduct: string,
   referredProduct: string,
 ) {
   if (referrerProduct === "personal" && referredProduct === "business") {
-    return REFERRAL_REWARDS.userRefersBusiness;
+    return rewards.userRefersBusiness;
   }
   if (referrerProduct === "business" && referredProduct === "personal") {
-    return REFERRAL_REWARDS.businessRefersUser;
+    return rewards.businessRefersUser;
   }
   if (referrerProduct === "business" && referredProduct === "business") {
-    return REFERRAL_REWARDS.businessRefersBusiness;
+    return rewards.businessRefersBusiness;
   }
-  return REFERRAL_REWARDS.userRefersUser;
+  return rewards.userRefersUser;
 }
 
 function computeReward(opts: {
@@ -73,7 +75,8 @@ export async function grantReferralRewardOnFirstPayment(referredTenantId: string
     return { ok: false as const, skipped: true };
   }
 
-  const rule = pickRule(referrer.product, referred.product);
+  const rewards = await loadReferralRewards();
+  const rule = pickRule(rewards, referrer.product, referred.product);
   const reward = computeReward({
     rule,
     referrerPrice: referrerPrice || 0,
