@@ -655,6 +655,16 @@
   color: var(--lp-ink-soft);
 }
 
+/* Chrome cola o login salvo (admin) no cadastro — campos-isca + fora da tela. */
+.ga-autofill-trap {
+  position: absolute;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
 /* Checkout Pix — funnel PrismaBook */
 .pix-panel {
   --pix-ink: #0b1a2f;

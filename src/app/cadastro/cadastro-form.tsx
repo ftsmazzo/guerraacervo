@@ -74,6 +74,18 @@ export function CadastroForm() {
     if (fromCookie) setReferralCode((current) => current || fromCookie);
   }, [params]);
 
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      const active = document.activeElement;
+      const name =
+        active instanceof HTMLElement ? active.getAttribute("name") : null;
+      if (name === "signup-email" || name === "signup-password") return;
+      setOwnerEmail("");
+      setPassword("");
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, []);
+
   async function onSubmitForm(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -168,7 +180,7 @@ export function CadastroForm() {
       >
         {paid
           ? "14 dias grátis, sem cartão. Você escolhe o plano depois de testar."
-          : "Plano grátis: confirme o WhatsApp e entre no painel."}
+          ) : "Plano grátis: confirme o WhatsApp e entre no painel."}
       </p>
       {params.get("cancel") ? (
         <p className="mt-3 rounded-md border border-line bg-card px-3 py-2 text-sm text-muted">
@@ -177,7 +189,27 @@ export function CadastroForm() {
       ) : null}
 
       {step === "form" ? (
-        <form onSubmit={onSubmitForm} className="mt-8 space-y-4">
+        <form
+          onSubmit={onSubmitForm}
+          autoComplete="off"
+          className="mt-8 space-y-4"
+        >
+          <div className="ga-autofill-trap" aria-hidden="true">
+            <input
+              type="text"
+              name="username"
+              tabIndex={-1}
+              defaultValue=""
+              autoComplete="username"
+            />
+            <input
+              type="password"
+              name="password"
+              tabIndex={-1}
+              defaultValue=""
+              autoComplete="current-password"
+            />
+          </div>
           {isPersonal ? (
             <Field label="Nome da biblioteca (opcional)">
               <input
@@ -201,6 +233,8 @@ export function CadastroForm() {
           <Field label="Seu nome">
             <input
               required
+              name="owner-name"
+              autoComplete="name"
               className="mt-1 w-full rounded-md border border-line bg-background px-3 py-2 outline-none focus:border-accent"
               value={ownerName}
               onChange={(e) => setOwnerName(e.target.value)}
@@ -209,7 +243,19 @@ export function CadastroForm() {
           <Field label="E-mail de acesso">
             <input
               required
-              type="email"
+              name="signup-email"
+              type="text"
+              inputMode="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
+              readOnly
+              onFocus={(e) => {
+                e.currentTarget.readOnly = false;
+              }}
               className="mt-1 w-full rounded-md border border-line bg-background px-3 py-2 outline-none focus:border-accent"
               value={ownerEmail}
               onChange={(e) => setOwnerEmail(e.target.value)}
@@ -218,8 +264,16 @@ export function CadastroForm() {
           <Field label="Senha">
             <input
               required
+              name="signup-password"
               type="password"
               minLength={6}
+              autoComplete="new-password"
+              data-1p-ignore
+              data-lpignore="true"
+              readOnly
+              onFocus={(e) => {
+                e.currentTarget.readOnly = false;
+              }}
               className="mt-1 w-full rounded-md border border-line bg-background px-3 py-2 outline-none focus:border-accent"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
