@@ -180,7 +180,7 @@ export function CadastroForm() {
       >
         {paid
           ? "14 dias grátis, sem cartão. Você escolhe o plano depois de testar."
-          ) : "Plano grátis: confirme o WhatsApp e entre no painel."}
+          : "Plano grátis: confirme o WhatsApp e entre no painel."}
       </p>
       {params.get("cancel") ? (
         <p className="mt-3 rounded-md border border-line bg-card px-3 py-2 text-sm text-muted">
