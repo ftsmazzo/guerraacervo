@@ -18,7 +18,11 @@ const landingSans = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "PrismaBook",
+  metadataBase: new URL("https://prismabook.com.br"),
+  title: {
+    default: "PrismaBook — catálogo e WhatsApp para sebos",
+    template: "%s · PrismaBook",
+  },
   description:
     "Sistema para sebos: catálogo, WhatsApp e vendas — planos Negócio com trial de 14 dias.",
   manifest: "/manifest.webmanifest",
