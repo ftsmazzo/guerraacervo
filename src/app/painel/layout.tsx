@@ -69,7 +69,7 @@ export default async function PainelLayout({
 }) {
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login?next=/painel");
-  if (ctx.user.isPlatformAdmin && !ctx.tenant) redirect("/admin");
+  // Admin sem sebo vê o aviso no painel; mandar a /admin com cookie antigo gerava loop.
 
   const planCode = ctx.tenant?.planCode;
   const isPersonal = ctx.tenant?.product === "personal";

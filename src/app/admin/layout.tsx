@@ -2,6 +2,8 @@ import Link from "next/link";
 import { LogoutButton } from "@/components/logout-button";
 import { requirePlatformAdmin } from "@/lib/auth/guards";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminLayout({
   children,
 }: {

@@ -54,33 +54,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Não redirecionar /login aqui: cookie velho + /admin+/painel gerava loop.
   if (pathname.startsWith("/login")) {
-    if (session) {
-      const dest = session.isPlatformAdmin ? "/admin" : "/painel";
-      return NextResponse.redirect(new URL(dest, request.url));
-    }
     return NextResponse.next();
   }
 
-  if (pathname.startsWith("/painel")) {
+  if (pathname.startsWith("/painel") || pathname.startsWith("/admin")) {
     if (!session) {
       const login = new URL("/login", request.url);
       login.searchParams.set("next", pathname);
       return NextResponse.redirect(login);
     }
-    const requestHeaders = new Headers(request.headers);
-    requestHeaders.set("x-pathname", pathname);
-    return NextResponse.next({ request: { headers: requestHeaders } });
-  }
-
-  if (pathname.startsWith("/admin")) {
-    if (!session) {
-      const login = new URL("/login", request.url);
-      login.searchParams.set("next", pathname);
-      return NextResponse.redirect(login);
-    }
-    if (!session.isPlatformAdmin) {
-      return NextResponse.redirect(new URL("/painel", request.url));
+    if (pathname.startsWith("/painel")) {
+      const requestHeaders = new Headers(request.headers);
+      requestHeaders.set("x-pathname", pathname);
+      return NextResponse.next({ request: { headers: requestHeaders } });
     }
     return NextResponse.next();
   }
