@@ -280,7 +280,7 @@
 .book-capture-modal {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: 80;
   background: rgba(15, 14, 13, 0.72);
   display: flex;
   align-items: flex-end;
@@ -312,6 +312,58 @@
   .book-capture-sheet {
     border-radius: 14px;
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
+  }
+}
+
+/* App no celular: tela cheia, shutter fora da tab bar e da safe area */
+@media (max-width: 639px) {
+  .book-capture-modal {
+    align-items: stretch;
+    background: #0b1a2f;
+  }
+
+  .book-capture-sheet {
+    max-width: none;
+    height: 100dvh;
+    height: 100svh;
+    max-height: none;
+    border-radius: 0;
+    padding: 0.55rem 0.85rem 0;
+    gap: 0.5rem;
+    box-shadow: none;
+  }
+
+  .book-capture-header {
+    flex-shrink: 0;
+  }
+
+  .book-capture-modes {
+    flex-shrink: 0;
+  }
+
+  .book-capture-stage,
+  .book-capture-stage.barcode {
+    flex: 1 1 auto;
+    aspect-ratio: auto;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .book-capture-footer {
+    flex-shrink: 0;
+    min-height: 4.25rem;
+    padding: 0.65rem 0 calc(1.15rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+body.ga-capture-open {
+  overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  body.ga-capture-open .painel-tabbar {
+    visibility: hidden;
+    pointer-events: none;
   }
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export type CaptureMode = "barcode" | "cover";
 
@@ -105,6 +106,7 @@ export function BookCapture({
   const [hint, setHint] = useState("Aponte o código de barras");
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -234,6 +236,16 @@ export function BookCapture({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- open/initialMode only
   }, [open, initialMode]);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    document.body.classList.add("ga-capture-open");
+    return () => document.body.classList.remove("ga-capture-open");
+  }, [open]);
+
   async function switchMode(next: CaptureMode) {
     if (next === mode && !preview) return;
     setMode(next);
@@ -344,14 +356,14 @@ export function BookCapture({
     }
   }
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  return createPortal(
     <div className="book-capture-modal" role="dialog" aria-modal="true">
       <div className="book-capture-sheet">
         <header className="book-capture-header">
           <div>
-            <strong>Webcam deste PC</strong>
+            <strong>Câmera</strong>
             <p className="book-capture-hint">{hint}</p>
           </div>
           <button
@@ -504,6 +516,7 @@ export function BookCapture({
           }}
         />
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
