@@ -28,7 +28,9 @@ export default async function AdminTenantsPage({
   const rows = await db
     .select({
       tenant: tenants,
-      bookCount: sql<number>`(select count(*)::int from ${books} where ${books.tenantId} = ${tenants.id})`,
+      bookCount: sql<number>`(select count(*)::int from ${books} where ${eq(books.tenantId, tenants.id)})`.mapWith(
+        Number,
+      ),
     })
     .from(tenants)
     .where(conditions.length ? and(...conditions) : undefined)
