@@ -1,10 +1,9 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 export function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,17 +17,29 @@ export function LoginForm() {
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const data = (await res.json()) as { error?: string; ok?: boolean };
+      const data = (await res.json()) as {
+        error?: string;
+        ok?: boolean;
+        user?: { isPlatformAdmin?: boolean };
+      };
       if (!res.ok) {
         setError(data.error ?? "Falha ao entrar.");
         return;
       }
-      const next = searchParams.get("next") || "/painel";
-      router.replace(next);
-      router.refresh();
+      const next = searchParams.get("next") || "";
+      const dest = data.user?.isPlatformAdmin
+        ? next.startsWith("/admin")
+          ? next
+          : "/admin"
+        : next.startsWith("/painel") || next.startsWith("/admin")
+          ? next
+          : "/painel";
+      window.location.assign(dest);
+      return;
     } catch {
       setError("Não foi possível conectar. Tente de novo.");
     } finally {
@@ -41,7 +52,11 @@ export function LoginForm() {
       <label className="block text-sm">
         <span className="text-muted">E-mail</span>
         <input
-          type="email"
+          type="text"
+          inputMode="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="email"

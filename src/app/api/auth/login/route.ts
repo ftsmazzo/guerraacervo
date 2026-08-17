@@ -6,7 +6,12 @@ import { setSessionCookie, signSession } from "@/lib/auth/session";
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
-  email: z.string().email(),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(3)
+    .refine((v) => v.includes("@"), "Informe e-mail e senha válidos."),
   password: z.string().min(1),
 });
 
