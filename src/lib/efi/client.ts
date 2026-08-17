@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import EfiPay from "sdk-node-apis-efi";
 
 export type EfiCharge = {
@@ -11,11 +12,24 @@ export type EfiCharge = {
 
 let cached: EfiPay | null = null;
 
+function efiCertBase64(): string | null {
+  const fromFile = process.env.EFI_CERT_P12_FILE?.trim();
+  if (fromFile) {
+    try {
+      const raw = readFileSync(fromFile, "utf8").trim();
+      if (raw) return raw;
+    } catch {
+      return null;
+    }
+  }
+  return process.env.EFI_CERT_P12_BASE64?.trim() || null;
+}
+
 export function efiConfigured() {
   return Boolean(
     process.env.EFI_CLIENT_ID?.trim() &&
       process.env.EFI_CLIENT_SECRET?.trim() &&
-      process.env.EFI_CERT_P12_BASE64?.trim() &&
+      efiCertBase64() &&
       process.env.EFI_PIX_KEY?.trim(),
   );
 }
@@ -28,7 +42,7 @@ export async function getEfiPay() {
     );
   }
   const sandbox = process.env.EFI_SANDBOX !== "false";
-  const raw = process.env.EFI_CERT_P12_BASE64!.trim();
+  const raw = efiCertBase64()!;
   const certificate = raw.replace(/^data:application\/x-pkcs12;base64,/i, "");
 
   cached = new EfiPay({
