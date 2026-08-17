@@ -11,6 +11,7 @@ import {
 } from "drizzle-orm";
 import { db } from "@/db";
 import { bookTags, books, orderItems, orders, tags } from "@/db/schema";
+import type { ReadingStatus } from "@/lib/reading/types";
 
 export type ListBooksFilters = {
   busca?: string;
@@ -19,6 +20,7 @@ export type ListBooksFilters = {
   disponivel?: string;
   /** Tags com lógica AND — livro deve ter todas */
   tags?: string[];
+  readingStatus?: ReadingStatus;
   /** Aceita chaves EN (UI) e PT (legado) */
   order?:
     | "titulo"
@@ -50,6 +52,8 @@ export type BookListItem = {
   stock: number;
   location: string | null;
   createdAt: Date;
+  readingStatus: ReadingStatus;
+  currentPage: number;
   reserved: number;
   available: number;
   tagsList: string[];
@@ -155,6 +159,10 @@ export async function listBooks(
     );
   }
 
+  if (filters.readingStatus) {
+    conditions.push(eq(books.readingStatus, filters.readingStatus));
+  }
+
   const activeTags = (filters.tags || [])
     .map((t) => t.trim())
     .filter(Boolean);
@@ -196,6 +204,8 @@ export async function listBooks(
       stock: books.stock,
       location: books.location,
       createdAt: books.createdAt,
+      readingStatus: books.readingStatus,
+      currentPage: books.currentPage,
     })
     .from(books)
     .where(and(...conditions))
@@ -225,6 +235,8 @@ export async function listBooks(
       stock: r.stock,
       location: r.location,
       createdAt: r.createdAt,
+      readingStatus: r.readingStatus,
+      currentPage: r.currentPage,
       reserved,
       available: r.stock - reserved,
       tagsList: tagsMap.get(r.id) ?? [],
@@ -264,6 +276,10 @@ export async function getBook(tenantId: string, id: string) {
       salePrice: books.salePrice,
       stock: books.stock,
       location: books.location,
+      readingStatus: books.readingStatus,
+      currentPage: books.currentPage,
+      startedAt: books.startedAt,
+      finishedAt: books.finishedAt,
       createdAt: books.createdAt,
       updatedAt: books.updatedAt,
     })

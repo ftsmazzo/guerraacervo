@@ -105,7 +105,11 @@ async function syncBookTags(
   }
 }
 
-function toDbValues(data: BookInput, tenantId: string) {
+function toDbValues(
+  data: BookInput,
+  tenantId: string,
+  product: string,
+) {
   return {
     tenantId,
     isbn: data.isbn?.trim() || null,
@@ -126,6 +130,9 @@ function toDbValues(data: BookInput, tenantId: string) {
     salePrice: String(data.precoVenda),
     stock: data.estoque,
     location: data.localizacao?.trim() || null,
+    ...(product === "personal"
+      ? { readingStatus: "quero_ler" as const }
+      : {}),
     updatedAt: new Date(),
   };
 }
@@ -157,7 +164,7 @@ export async function createBook(
   }
 
   const tagNames = normalizeTags(parsed.data.tags || []);
-  const values = toDbValues(parsed.data, ctx.tenant.id);
+  const values = toDbValues(parsed.data, ctx.tenant.id, ctx.tenant.product);
 
   try {
     const [row] = await db
@@ -225,8 +232,8 @@ export async function updateBook(
   if (!existing) return { ok: false, error: "Livro não encontrado." };
 
   const tagNames = normalizeTags(parsed.data.tags || []);
-  const values = toDbValues(parsed.data, ctx.tenant.id);
-  // tenantId não deve mudar no update
+  const values = toDbValues(parsed.data, ctx.tenant.id, "business");
+  // tenantId não deve mudar no update; readingStatus é da estante, não da ficha
   const { tenantId: _, ...updateValues } = values;
   void _;
 

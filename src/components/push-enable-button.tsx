@@ -39,8 +39,15 @@ function detectEnv() {
 }
 
 type Variant = "card" | "compact";
+type Kind = "reservas" | "leitura";
 
-export function PushAlertsCard({ variant = "card" }: { variant?: Variant }) {
+export function PushAlertsCard({
+  variant = "card",
+  kind = "reservas",
+}: {
+  variant?: Variant;
+  kind?: Kind;
+}) {
   const [env, setEnv] = useState(detectEnv);
   const [enabled, setEnabled] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -120,7 +127,11 @@ export function PushAlertsCard({ variant = "card" }: { variant?: Variant }) {
           return;
         }
         setEnabled(true);
-        setMessage("Pronto — reservas vão notificar neste aparelho.");
+        setMessage(
+          kind === "leitura"
+            ? "Pronto — o lembrete de leitura chega neste aparelho."
+            : "Pronto — reservas vão notificar neste aparelho.",
+        );
       } catch (e) {
         setMessage(e instanceof Error ? e.message : "Erro ao ativar push.");
       }
@@ -157,8 +168,20 @@ export function PushAlertsCard({ variant = "card" }: { variant?: Variant }) {
         <p className="text-xs font-medium text-ink">Alertas no celular</p>
         {!canActivate && env.isIos ? (
           <p className="mt-1 text-[0.7rem] leading-snug text-muted">
-            iPhone: abra <a href="/painel/loja#app-celular" className="underline">Loja</a> e
-            siga o tutorial (Safari → Compartilhar → Tela de Início).
+            {kind === "leitura" ? (
+              <>
+                iPhone: Safari → Compartilhar → Adicionar à Tela de Início, e
+                abra pelo ícone.
+              </>
+            ) : (
+              <>
+                iPhone: abra{" "}
+                <a href="/painel/loja#app-celular" className="underline">
+                  Loja
+                </a>{" "}
+                e siga o tutorial (Safari → Compartilhar → Tela de Início).
+              </>
+            )}
           </p>
         ) : (
           <button
@@ -187,17 +210,27 @@ export function PushAlertsCard({ variant = "card" }: { variant?: Variant }) {
     <div className="rounded-lg border border-line bg-card p-5 shadow-[var(--shadow)]">
       <h3 className="text-sm font-semibold text-ink">Notificações no celular</h3>
       <p className="mt-1 text-sm text-muted">
-        Depois de instalar o app (passo acima), ative aqui para receber reserva
-        mesmo com o painel fechado.
+        {kind === "leitura"
+          ? "Depois de instalar o app na tela inicial, ative aqui para receber o lembrete da meta diária mesmo com o painel fechado."
+          : "Depois de instalar o app (passo acima), ative aqui para receber reserva mesmo com o painel fechado."}
       </p>
 
       {env.isIos && !env.isStandalone ? (
         <p className="mt-3 rounded-md border border-dashed border-line bg-background px-3 py-2 text-sm text-muted">
-          Ainda no Safari? Complete o tutorial{" "}
-          <a href="#app-celular" className="font-medium text-accent-text underline">
-            App no celular
-          </a>{" "}
-          e abra pelo ícone da tela inicial — aí o botão Ativar libera.
+          {kind === "leitura" ? (
+            <>
+              Ainda no Safari? Use Compartilhar → Adicionar à Tela de Início e
+              abra pelo ícone — aí o botão Ativar libera.
+            </>
+          ) : (
+            <>
+              Ainda no Safari? Complete o tutorial{" "}
+              <a href="#app-celular" className="font-medium text-accent-text underline">
+                App no celular
+              </a>{" "}
+              e abra pelo ícone da tela inicial — aí o botão Ativar libera.
+            </>
+          )}
         </p>
       ) : null}
 

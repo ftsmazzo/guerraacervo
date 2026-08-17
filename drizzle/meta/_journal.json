@@ -36,6 +36,13 @@
       "when": 1786800000000,
       "tag": "0004_platform_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786810000000,
+      "tag": "0005_reading_habit",
+      "breakpoints": true
     }
   ]
 }

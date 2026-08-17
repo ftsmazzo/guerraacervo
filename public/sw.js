@@ -29,7 +29,7 @@ self.addEventListener("push", (event) => {
       icon: "/prismabook-icon.png",
       badge: "/prismabook-icon.png",
       data: { url: data.url || "/painel" },
-      tag: "ga-reservation",
+      tag: data.tag || "ga-alert",
       renotify: true,
     }),
   );

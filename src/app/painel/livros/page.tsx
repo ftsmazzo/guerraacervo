@@ -2,7 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAuthContext, hasEntitlement } from "@/lib/auth/context";
 import { listBooks, listTagCloud } from "@/lib/books/queries";
+import { countByReadingStatus } from "@/lib/reading/queries";
+import { isReadingStatus, type ReadingStatus } from "@/lib/reading/types";
 import { DeleteBookButton } from "./delete-book-button";
+import { PersonalEstante } from "./estante-personal";
 import "./livros.css";
 
 export const dynamic = "force-dynamic";
@@ -87,6 +90,8 @@ export default async function LivrosPage({
   const busca = sp.busca?.trim() || "";
   const estado = sp.estado || "";
   const disponivel = sp.disponivel || "";
+  const shelfRaw = sp.shelf || "lendo";
+  const shelf: ReadingStatus = isReadingStatus(shelfRaw) ? shelfRaw : "lendo";
   const activeTags = (sp.tags || "")
     .split(",")
     .map((t) => t.trim())
@@ -110,21 +115,47 @@ export default async function LivrosPage({
 
   let livros: Awaited<ReturnType<typeof listBooks>> = [];
   let cloud: Awaited<ReturnType<typeof listTagCloud>> = [];
+  let counts: Record<ReadingStatus, number> = {
+    quero_ler: 0,
+    lendo: 0,
+    lido: 0,
+    abandonado: 0,
+  };
   let loadError: string | null = null;
   try {
-    [livros, cloud] = await Promise.all([
+    const jobs: Promise<unknown>[] = [
       listBooks(ctx.tenant.id, {
         busca,
-        estado,
-        disponivel,
+        estado: isPersonal ? undefined : estado,
+        disponivel: isPersonal ? undefined : disponivel,
         tags: activeTags,
         order,
         dir,
+        readingStatus: isPersonal ? shelf : undefined,
       }),
       listTagCloud(ctx.tenant.id, { activeTags }),
-    ]);
+    ];
+    if (isPersonal) jobs.push(countByReadingStatus(ctx.tenant.id));
+    const results = await Promise.all(jobs);
+    livros = results[0] as typeof livros;
+    cloud = results[1] as typeof cloud;
+    if (isPersonal) counts = results[2] as typeof counts;
   } catch (e) {
     loadError = e instanceof Error ? e.message : String(e);
+  }
+
+  if (isPersonal) {
+    return (
+      <PersonalEstante
+        livros={livros}
+        cloud={cloud}
+        counts={counts}
+        shelf={shelf}
+        busca={busca}
+        activeTags={activeTags}
+        loadError={loadError}
+      />
+    );
   }
 
   function toggleTag(name: string) {

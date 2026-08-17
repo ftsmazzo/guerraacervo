@@ -42,6 +42,16 @@ const nav: NavItem[] = [
   { href: "/painel/assinatura", label: "Assinatura" },
 ];
 
+const personalNav: NavItem[] = [
+  { href: "/painel", label: "Início" },
+  { href: "/painel/livros", label: "Estante", entitlement: "catalog" },
+  { href: "/painel/comunidade", label: "Comunidade" },
+  { href: "/painel/leitura", label: "Plano" },
+  { href: "/painel/desejos", label: "Desejos", entitlement: "wishlist" },
+  { href: "/painel/indique", label: "Indique e ganhe" },
+  { href: "/painel/assinatura", label: "Assinatura" },
+];
+
 function allowed(
   planCode: string | null | undefined,
   entitlement?: Entitlement | Entitlement[],
@@ -81,13 +91,15 @@ export default async function PainelLayout({
     ctx.tenant && !isPersonal ? await listTenantAlerts(ctx.tenant.id, 5) : [];
   const pathname = (await headers()).get("x-pathname") || "";
   const billingOpen = pathname.startsWith("/painel/assinatura");
-  const visibleNav = nav.filter((item) => allowed(planCode, item.entitlement));
+  const visibleNav = (isPersonal ? personalNav : nav).filter((item) =>
+    allowed(planCode, item.entitlement),
+  );
   const mobileNav = isPersonal
     ? [
         { href: "/painel", label: "Início" },
-        { href: "/painel/livros", label: "Livros" },
-        { href: "/painel/desejos", label: "Desejos" },
-        { href: "/painel/assinatura", label: "Plano" },
+        { href: "/painel/livros", label: "Estante" },
+        { href: "/painel/comunidade", label: "Comunidade" },
+        { href: "/painel/leitura", label: "Plano" },
       ]
     : [
         { href: "/painel", label: "Início" },
@@ -168,9 +180,12 @@ export default async function PainelLayout({
               <LogoutButton className="text-sm text-muted hover:text-ink" />
             </div>
           </div>
-          {ctx.tenant && access.ok && !isPersonal ? (
+          {ctx.tenant && access.ok ? (
             <div className="border-t border-line px-4 py-2 md:hidden">
-              <PushAlertsCard variant="compact" />
+              <PushAlertsCard
+                variant="compact"
+                kind={isPersonal ? "leitura" : "reservas"}
+              />
             </div>
           ) : null}
         </header>

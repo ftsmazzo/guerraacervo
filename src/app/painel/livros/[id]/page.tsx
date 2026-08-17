@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getAuthContext, hasEntitlement } from "@/lib/auth/context";
 import { getBook } from "@/lib/books/queries";
+import { ReadingBookCard } from "@/components/reading/reading-cover";
 import { BookForm } from "../book-form";
 import "../livros.css";
 
@@ -17,10 +18,26 @@ export default async function EditarLivroPage({
   const { id } = await params;
   const book = await getBook(ctx.tenant.id, id);
   if (!book) notFound();
+  const personal = ctx.tenant.product === "personal";
 
   return (
+    <div>
+      {personal ? (
+        <div className="mb-4">
+          <ReadingBookCard
+            bookId={book.id}
+            title={book.title}
+            author={book.author}
+            coverUrl={book.coverUrl}
+            currentPage={book.currentPage}
+            pages={book.pages}
+            readingStatus={book.readingStatus}
+            size="lg"
+          />
+        </div>
+      ) : null}
     <BookForm
-      personal={ctx.tenant.product === "personal"}
+      personal={personal}
       initial={{
         id: book.id,
         isbn: book.isbn,
@@ -47,5 +64,6 @@ export default async function EditarLivroPage({
         updatedAt: book.updatedAt.toISOString(),
       }}
     />
+    </div>
   );
 }

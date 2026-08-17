@@ -24,6 +24,7 @@ export async function sendPushToTenant(
     title: string;
     body: string;
     url: string;
+    tag?: string;
   },
 ) {
   if (!configureVapid()) {

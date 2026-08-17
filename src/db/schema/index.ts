@@ -1,5 +1,6 @@
 import {
   boolean,
+  date,
   integer,
   jsonb,
   numeric,
@@ -33,6 +34,12 @@ export const bookConditionEnum = pgEnum("book_condition", [
   "Regular",
 ]);
 export const coverTypeEnum = pgEnum("cover_type", ["Brochura", "Capa Dura"]);
+export const readingStatusEnum = pgEnum("reading_status", [
+  "quero_ler",
+  "lendo",
+  "lido",
+  "abandonado",
+]);
 export const paymentMethodEnum = pgEnum("payment_method", [
   "Dinheiro",
   "Pix",
@@ -159,6 +166,12 @@ export const books = pgTable("books", {
   salePrice: numeric("sale_price", { precision: 12, scale: 2 }).notNull(),
   stock: integer("stock").notNull().default(1),
   location: varchar("location", { length: 120 }),
+  readingStatus: readingStatusEnum("reading_status")
+    .notNull()
+    .default("quero_ler"),
+  currentPage: integer("current_page").notNull().default(0),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
   ...timestamps,
 });
 
@@ -371,6 +384,77 @@ export const platformSettings = pgTable("platform_settings", {
   key: varchar("key", { length: 80 }).primaryKey(),
   value: jsonb("value").$type<Record<string, unknown>>().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const readingPlans = pgTable(
+  "reading_plans",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    dailyPages: integer("daily_pages").notNull().default(20),
+    remindAt: varchar("remind_at", { length: 5 }).notNull().default("21:00"),
+    timezone: varchar("timezone", { length: 64 })
+      .notNull()
+      .default("America/Sao_Paulo"),
+    enabled: boolean("enabled").notNull().default(true),
+    lastRemindedOn: date("last_reminded_on"),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("reading_plans_tenant_uidx").on(t.tenantId)],
+);
+
+export const readingLogs = pgTable(
+  "reading_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    bookId: uuid("book_id").references(() => books.id, { onDelete: "set null" }),
+    pagesRead: integer("pages_read").notNull().default(0),
+    readOn: date("read_on").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("reading_logs_tenant_book_day_uidx").on(
+      t.tenantId,
+      t.bookId,
+      t.readOn,
+    ),
+  ],
+);
+
+export const readingPosts = pgTable("reading_posts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  bookId: uuid("book_id").references(() => books.id, { onDelete: "set null" }),
+  body: text("body").notNull(),
+  displayName: varchar("display_name", { length: 160 }).notNull(),
+  title: varchar("title", { length: 300 }).notNull(),
+  author: varchar("author", { length: 200 }),
+  coverUrl: text("cover_url"),
+  ...timestamps,
+});
+
+export const readingComments = pgTable("reading_comments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  postId: uuid("post_id")
+    .notNull()
+    .references(() => readingPosts.id, { onDelete: "cascade" }),
+  tenantId: uuid("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  body: text("body").notNull(),
+  displayName: varchar("display_name", { length: 160 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
 });
