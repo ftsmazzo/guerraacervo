@@ -13,7 +13,6 @@ import {
   isReadingStatus,
   parseRemindAt,
   todayInTimeZone,
-  type ReadingStatus,
 } from "@/lib/reading/types";
 
 function assertPersonal() {
@@ -124,7 +123,7 @@ export async function logPagesRead(input: {
   const tz = plan?.timezone || "America/Sao_Paulo";
   const day = todayInTimeZone(tz);
 
-  let bookId = input.bookId?.trim() || null;
+  const bookId = input.bookId?.trim() || null;
   if (bookId) {
     const [book] = await db
       .select()
