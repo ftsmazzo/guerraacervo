@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto";
 import { getRedis } from "@/lib/redis";
 
-export const SCAN_SESSION_TTL_SEC = 300;
+export const SCAN_SESSION_TTL_SEC = 600;
 export const SCAN_RESULT_TTL_SEC = 60;
 export const SCAN_PHOTO_MAX_CHARS = 900_000;
 
@@ -59,6 +59,13 @@ export async function getScanSession(
   }
 }
 
+export async function scanSessionTtlSec(token: string): Promise<number> {
+  if (!token || token.length < 16) return -2;
+  const redis = getRedis();
+  if (redis.status !== "ready") await redis.connect();
+  return redis.ttl(sessKey(token));
+}
+
 export async function putScanResult(
   token: string,
   result: ScanResult,
@@ -73,6 +80,7 @@ export async function putScanResult(
     "EX",
     SCAN_RESULT_TTL_SEC,
   );
+  await redis.expire(sessKey(token), SCAN_SESSION_TTL_SEC);
   return true;
 }
 

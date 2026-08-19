@@ -5,6 +5,8 @@ import {
   eq,
   ilike,
   inArray,
+  isNotNull,
+  isNull,
   or,
   sql,
   type SQL,
@@ -16,7 +18,7 @@ import type { ReadingStatus } from "@/lib/reading/types";
 export type ListBooksFilters = {
   busca?: string;
   estado?: string;
-  /** "1" = disponível > 0; "0" = reservado sem disponível; "esgotado" = estoque 0 */
+  /** "1" = disponível > 0; "0" = reservado sem disponível; "esgotado" = estoque 0; "arquivados" = baixados */
   disponivel?: string;
   /** Tags com lógica AND — livro deve ter todas */
   tags?: string[];
@@ -136,6 +138,11 @@ export async function listBooks(
   filters: ListBooksFilters = {},
 ): Promise<BookListItem[]> {
   const conditions: SQL[] = [eq(books.tenantId, tenantId)];
+  if (filters.disponivel === "arquivados") {
+    conditions.push(isNotNull(books.archivedAt));
+  } else {
+    conditions.push(isNull(books.archivedAt));
+  }
 
   const busca = filters.busca?.trim();
   if (busca) {
@@ -351,6 +358,7 @@ export async function listTagCloud(
   const conditions: SQL[] = [
     eq(tags.tenantId, tenantId),
     eq(books.tenantId, tenantId),
+    isNull(books.archivedAt),
   ];
   if (bookScope) {
     conditions.push(inArray(bookTags.bookId, bookScope));

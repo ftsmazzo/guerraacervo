@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import {
   getScanSession,
   putScanResult,
+  scanSessionTtlSec,
   SCAN_PHOTO_MAX_CHARS,
+  SCAN_SESSION_TTL_SEC,
   type ScanResult,
 } from "@/lib/scan-sessions";
 
@@ -20,9 +22,11 @@ export async function GET(_req: Request, ctx: Ctx) {
       { status: 404 },
     );
   }
+  const ttl = await scanSessionTtlSec(token);
+  const ttlSec = ttl > 0 ? ttl : SCAN_SESSION_TTL_SEC;
   return NextResponse.json({
     ok: true,
-    expiresAt: sess.createdAt + 300_000,
+    expiresAt: Date.now() + ttlSec * 1000,
   });
 }
 

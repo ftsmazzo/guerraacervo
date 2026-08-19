@@ -243,6 +243,7 @@ export default async function LivrosPage({
               <option value="1">Disponíveis</option>
               <option value="0">Reservados</option>
               <option value="esgotado">Esgotados</option>
+              <option value="arquivados">Arquivados</option>
             </select>
             <button className="btn-accent" type="submit">
               Filtrar

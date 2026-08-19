@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { books, tenants } from "@/db/schema";
@@ -69,6 +69,7 @@ export default async function VitrinePage({
   const conditions = [
     eq(books.tenantId, tenant.id),
     gt(books.stock, 0),
+    isNull(books.archivedAt),
   ];
   if (busca) {
     const like = `%${busca}%`;

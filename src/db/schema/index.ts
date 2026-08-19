@@ -166,6 +166,7 @@ export const books = pgTable("books", {
   salePrice: numeric("sale_price", { precision: 12, scale: 2 }).notNull(),
   stock: integer("stock").notNull().default(1),
   location: varchar("location", { length: 120 }),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
   readingStatus: readingStatusEnum("reading_status")
     .notNull()
     .default("quero_ler"),

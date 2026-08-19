@@ -264,6 +264,7 @@ export async function updateOrderStatus(
             .update(books)
             .set({
               stock: sql`${books.stock} + ${item.quantity}`,
+              archivedAt: null,
             })
             .where(
               and(eq(books.id, item.bookId), eq(books.tenantId, tenantId)),

@@ -14,10 +14,12 @@ import { getWhatsappConnection } from "@/lib/whatsapp/queries";
 
 export type TenantAlert = {
   id: string;
-  type: "reservation";
-  orderId: string;
+  type: "reservation" | "handoff";
+  orderId?: string;
+  clientId?: string;
   bookTitle: string;
   clientName: string;
+  preview?: string;
   source: "whatsapp" | "online" | "painel";
   createdAt: number;
 };
@@ -43,8 +45,10 @@ export async function pushTenantAlert(
     id: alert.id || randomUUID(),
     type: alert.type,
     orderId: alert.orderId,
+    clientId: alert.clientId,
     bookTitle: alert.bookTitle,
     clientName: alert.clientName,
+    preview: alert.preview,
     source: alert.source,
     createdAt: alert.createdAt || Date.now(),
   };
@@ -188,6 +192,61 @@ export async function notifySeboReservation(opts: {
     ``,
     `Pedido: ${link}`,
   ].join("\n");
+
+  for (const phone of phones) {
+    try {
+      await sendTextMessage(cfg, conn.instanceName, phone, text);
+    } catch (e) {
+      console.warn("[alerts] WhatsApp sebo falhou", phone, e);
+    }
+  }
+}
+
+/** Avisa o sebo: cliente no WhatsApp precisa de pessoa (venda, troca, papo fora do catálogo). */
+export async function notifySeboHandoff(opts: {
+  tenantId: string;
+  clientName: string;
+  clientId?: string;
+  preview: string;
+  phone: string;
+}) {
+  const snippet = opts.preview.replace(/\s+/g, " ").trim().slice(0, 140);
+  await pushTenantAlert(opts.tenantId, {
+    type: "handoff",
+    clientId: opts.clientId,
+    bookTitle: snippet || "WhatsApp",
+    clientName: opts.clientName,
+    preview: snippet,
+    source: "whatsapp",
+  });
+
+  const link = opts.clientId
+    ? `${appPublicUrl()}/painel/clientes/${opts.clientId}`
+    : `${appPublicUrl()}/painel/clientes`;
+
+  void sendPushToTenant(opts.tenantId, {
+    title: "Cliente no WhatsApp",
+    body: `${opts.clientName}: ${snippet || "quer falar com você"}`,
+    url: link,
+  }).catch((e) => console.warn("[alerts] push handoff", e));
+
+  const cfg = resolveEvolutionConfig();
+  const conn = await getWhatsappConnection(opts.tenantId);
+  if (!cfg || !conn || conn.status !== "open") return;
+
+  const phones = await resolveSeboNotifyPhones(opts.tenantId);
+  if (!phones.length) return;
+
+  const text = [
+    `*Cliente no WhatsApp* — precisa de você`,
+    `*${opts.clientName}*`,
+    opts.phone ? `Tel: ${opts.phone}` : null,
+    snippet ? `Mensagem: ${snippet}` : null,
+    ``,
+    `Painel: ${link}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   for (const phone of phones) {
     try {

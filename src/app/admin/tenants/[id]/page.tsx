@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { count, eq } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { books, memberships, tenants, users } from "@/db/schema";
 import { requirePlatformAdmin } from "@/lib/auth/guards";
@@ -21,7 +21,7 @@ export default async function AdminTenantDetailPage({
   const [bookRow] = await db
     .select({ value: count() })
     .from(books)
-    .where(eq(books.tenantId, tenant.id));
+    .where(and(eq(books.tenantId, tenant.id), isNull(books.archivedAt)));
 
   const members = await db
     .select({

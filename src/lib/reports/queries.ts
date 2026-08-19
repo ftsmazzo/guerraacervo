@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { books, clients, orderItems, orders } from "@/db/schema";
 import { DEBIT_STATUSES, ORDER_STATUSES } from "@/lib/orders/constants";
@@ -133,7 +133,7 @@ export async function getReportKpis(
     })
     .from(books)
     .leftJoin(reservedByBook, eq(reservedByBook.bookId, books.id))
-    .where(eq(books.tenantId, tenantId));
+    .where(and(eq(books.tenantId, tenantId), isNull(books.archivedAt)));
 
   const receita = Number(sales?.receita ?? 0);
   const pedidosPagos = Number(sales?.pedidos ?? 0);
@@ -445,7 +445,7 @@ export async function listStockReport(tenantId: string): Promise<StockRow[]> {
     })
     .from(books)
     .leftJoin(reservedByBook, eq(reservedByBook.bookId, books.id))
-    .where(eq(books.tenantId, tenantId))
+    .where(and(eq(books.tenantId, tenantId), isNull(books.archivedAt)))
     .orderBy(asc(books.title));
 
   return rows.map((r) => {

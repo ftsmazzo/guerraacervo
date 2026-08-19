@@ -24,7 +24,7 @@ import {
 const QUEUE_KEY = "ga:wa:notify";
 
 /** Cliente só é avisado se cruzar pelo menos N tags com o livro. */
-export const MIN_INTEREST_TAG_OVERLAP = 3;
+export const MIN_INTEREST_TAG_OVERLAP = 1;
 
 export type NewBookNotifyJob = {
   type: "new_book";

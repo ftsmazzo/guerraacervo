@@ -61,7 +61,7 @@ export default function MobileScanPage() {
   const params = useParams<{ token: string }>();
   const token = params.token;
 
-  const [status, setStatus] = useState<"loading" | "ready" | "sent" | "error">(
+  const [status, setStatus] = useState<"loading" | "ready" | "error">(
     "loading",
   );
   const [message, setMessage] = useState("Validando sessão…");
@@ -89,6 +89,7 @@ export default function MobileScanPage() {
   const sendResult = useCallback(
     async (body: { type: "isbn"; code: string } | { type: "photo"; imageBase64: string }) => {
       if (sentRef.current || sending) return;
+      sentRef.current = true;
       setSending(true);
       try {
         const res = await fetch(`/api/scan-sessions/${token}`, {
@@ -98,25 +99,30 @@ export default function MobileScanPage() {
         });
         const d = await res.json();
         if (!res.ok) throw new Error(d.error || "Falha ao enviar");
-        sentRef.current = true;
-        stopCam();
-        setStatus("sent");
+        setPreview(null);
         setMessage(
           body.type === "isbn"
-            ? `ISBN enviado: ${body.code}`
-            : "Foto enviada para o computador",
+            ? `ISBN enviado: ${body.code}. Aponte o próximo.`
+            : "Foto enviada. Pode fotografar o próximo.",
         );
         try {
           navigator.vibrate?.(50);
         } catch {
           /* ignore */
         }
+        const video = videoRef.current;
+        if (video?.srcObject) void video.play();
+        window.setTimeout(() => {
+          sentRef.current = false;
+          setSending(false);
+        }, 2500);
       } catch (e) {
-        setMessage(e instanceof Error ? e.message : "Erro ao enviar");
+        sentRef.current = false;
         setSending(false);
+        setMessage(e instanceof Error ? e.message : "Erro ao enviar");
       }
     },
-    [sending, stopCam, token],
+    [sending, token],
   );
 
   const startBarcode = useCallback(async () => {
@@ -240,17 +246,6 @@ export default function MobileScanPage() {
     );
   }
 
-  if (status === "sent") {
-    return (
-      <main className="ms-page sent">
-        <div className="ms-check">✓</div>
-        <h1>Enviado</h1>
-        <p className="ms-msg">{message}</p>
-        <p className="ms-hint">Pode voltar ao computador — a ficha já atualiza.</p>
-      </main>
-    );
-  }
-
   return (
     <main className="ms-page">
       <header className="ms-header">
@@ -326,7 +321,10 @@ export default function MobileScanPage() {
           )}
         </div>
       ) : (
-        <p className="ms-hint">Leitura automática — mantenha o código na mira.</p>
+        <p className="ms-hint">
+          Leitura automática — mantenha o código na mira. Depois de cadastrar no
+          PC, leia o próximo neste mesmo QR.
+        </p>
       )}
     </main>
   );

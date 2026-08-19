@@ -37,19 +37,45 @@ export function ReservationAlertsBanner({
           className="flex flex-col gap-2 border-b border-line/60 px-4 py-3 text-sm text-accent-text last:border-b-0 md:flex-row md:flex-wrap md:items-center md:justify-between md:px-6 md:py-2.5"
         >
           <p className="leading-snug">
-            <span className="font-semibold">Nova reserva</span>
-            {" — "}
-            tire <span className="font-medium">{a.bookTitle}</span> da
-            prateleira
-            {a.clientName ? ` · ${a.clientName}` : null}
+            {a.type === "handoff" ? (
+              <>
+                <span className="font-semibold">Cliente no WhatsApp</span>
+                {" — "}
+                {a.clientName}
+                {a.preview || a.bookTitle
+                  ? ` · ${a.preview || a.bookTitle}`
+                  : null}
+              </>
+            ) : (
+              <>
+                <span className="font-semibold">Nova reserva</span>
+                {" — "}
+                tire <span className="font-medium">{a.bookTitle}</span> da
+                prateleira
+                {a.clientName ? ` · ${a.clientName}` : null}
+              </>
+            )}
           </p>
           <div className="flex items-center gap-3">
-            <Link
-              href={`/painel/pedidos/${a.orderId}`}
-              className="inline-flex min-h-10 flex-1 items-center justify-center rounded-md bg-accent px-3 py-2 text-sm font-medium text-white md:min-h-0 md:flex-none md:bg-transparent md:px-0 md:py-0 md:text-accent-text md:underline"
-            >
-              Abrir pedido
-            </Link>
+            {a.type === "handoff" ? (
+              <Link
+                href={
+                  a.clientId
+                    ? `/painel/clientes/${a.clientId}`
+                    : "/painel/clientes"
+                }
+                className="inline-flex min-h-10 flex-1 items-center justify-center rounded-md bg-accent px-3 py-2 text-sm font-medium text-white md:min-h-0 md:flex-none md:bg-transparent md:px-0 md:py-0 md:text-accent-text md:underline"
+              >
+                Abrir cliente
+              </Link>
+            ) : (
+              <Link
+                href={`/painel/pedidos/${a.orderId}`}
+                className="inline-flex min-h-10 flex-1 items-center justify-center rounded-md bg-accent px-3 py-2 text-sm font-medium text-white md:min-h-0 md:flex-none md:bg-transparent md:px-0 md:py-0 md:text-accent-text md:underline"
+              >
+                Abrir pedido
+              </Link>
+            )}
             <button
               type="button"
               disabled={pending}

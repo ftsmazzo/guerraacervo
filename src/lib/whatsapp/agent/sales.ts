@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { clientProfiles, tenants } from "@/db/schema";
+import { tenants } from "@/db/schema";
 import {
   openRouterChat,
   resolveOpenRouterConfig,
@@ -10,6 +10,7 @@ import {
   getSuggestedBooks,
   setSuggestedBooks,
 } from "@/lib/whatsapp/agent/debounce";
+import { pauseBotAndNotifyHandoff } from "@/lib/whatsapp/agent/handoff";
 import {
   INTENT_JSON_SCHEMA,
   SELLER_REPLY_JSON_SCHEMA,
@@ -18,6 +19,7 @@ import {
   buildSellerReplySystemPrompt,
   type SalesIntent,
 } from "@/lib/whatsapp/agent/prompts";
+import { setWaLane, triageMenuText } from "@/lib/whatsapp/agent/triage";
 import { createOrderInternal } from "@/lib/whatsapp/agent/reserve";
 import {
   authorMatchesQuery,
@@ -88,6 +90,9 @@ function ordinalIndex(text: string): number {
 function strongHeuristicIntent(text: string): SalesIntent | null {
   const t = text.toLowerCase().trim();
   if (/atendente|humano|pessoa real|falar com (algu[eé]m|pessoa)/.test(t)) {
+    return { intent: "handoff", query: "", bookIndex: 0, replyHint: "" };
+  }
+  if (/aceita troca|trazer (o )?livro|compram livros?|quero vender/.test(t)) {
     return { intent: "handoff", query: "", bookIndex: 0, replyHint: "" };
   }
   if (/^(menu|ajuda|help)$/i.test(t)) {
@@ -213,7 +218,8 @@ async function classifyIntent(
             '"quero o 2", "o livro 2", "reservar 1" = reserve com bookIndex. ' +
             "Se citar autor/tema (mesmo junto com indicação), intent=search e query=autor/tema. " +
             "Só use recommend quando pedir indicação SEM autor/tema. " +
-            "Se citar um título específico para levar, intent=reserve e query=título.",
+            "Se citar um título específico para levar, intent=reserve e query=título. " +
+            "Pergunta que não é catálogo, reserva, pedido ou indicação (troca, trazer livro, papo) = handoff.",
         },
         { role: "user", content: text },
       ],
@@ -563,29 +569,47 @@ export async function runSalesAgent(opts: {
   const intent = await classifyIntent(seboName, opts.text);
 
   if (intent.intent === "handoff") {
-    await db
-      .update(clientProfiles)
-      .set({ onboardingStep: "human", updatedAt: new Date() })
-      .where(eq(clientProfiles.id, opts.profileId));
-    await sendTextMessage(
-      opts.cfg,
-      opts.instanceName,
-      opts.phone,
-      `Combinado${firstName ? `, ${firstName}` : ""}. Vou avisar o pessoal do sebo — pode mandar o que precisar por aqui.\n` +
-        `(Pra voltar comigo: *voltar bot*)`,
-    );
+    await pauseBotAndNotifyHandoff({
+      cfg: opts.cfg,
+      tenantId: opts.tenantId,
+      instanceName: opts.instanceName,
+      phone: opts.phone,
+      clientName: opts.clientName,
+      clientId: opts.clientId,
+      profileId: opts.profileId,
+      preview: opts.text,
+      reason: "off_topic",
+    });
     return;
   }
 
   if (intent.intent === "menu") {
+    await setWaLane(opts.tenantId, opts.phone, "awaiting");
     await sendTextMessage(
       opts.cfg,
       opts.instanceName,
       opts.phone,
-      `Oi${firstName ? `, ${firstName}` : ""}! Me fala um autor, um título ou um tema que eu olho na prateleira.\n` +
-        `Se quiser, diga *indicações* que eu puxo do seu gosto — ou *atendente* pra falar com a loja.`,
+      triageMenuText(seboName),
     );
     return;
+  }
+
+  if (intent.intent === "chitchat") {
+    const topic = extractTopicQuery(opts.text);
+    if (!topic) {
+      await pauseBotAndNotifyHandoff({
+        cfg: opts.cfg,
+        tenantId: opts.tenantId,
+        instanceName: opts.instanceName,
+        phone: opts.phone,
+        clientName: opts.clientName,
+        clientId: opts.clientId,
+        profileId: opts.profileId,
+        preview: opts.text,
+        reason: "off_topic",
+      });
+      return;
+    }
   }
 
   if (intent.intent === "status_order") {

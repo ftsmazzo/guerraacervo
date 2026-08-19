@@ -240,7 +240,10 @@ export async function updateBook(
   try {
     await db
       .update(books)
-      .set(updateValues)
+      .set({
+        ...updateValues,
+        ...(parsed.data.estoque > 0 ? { archivedAt: null } : {}),
+      })
       .where(and(eq(books.id, id), eq(books.tenantId, ctx.tenant.id)));
 
     await syncBookTags(ctx.tenant.id, id, tagNames);

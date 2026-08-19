@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
   bookTags,
@@ -155,6 +155,7 @@ export async function searchCatalogForAgent(opts: {
   const conditions: SQL[] = [
     eq(books.tenantId, opts.tenantId),
     sql`${books.stock} > 0`,
+    isNull(books.archivedAt),
   ];
 
   const q = opts.query?.trim();
@@ -171,6 +172,7 @@ export async function searchCatalogForAgent(opts: {
         and(
           eq(books.tenantId, opts.tenantId),
           sql`${books.stock} > 0`,
+          isNull(books.archivedAt),
           ilike(tags.name, like),
         ),
       )
@@ -202,6 +204,7 @@ export async function searchCatalogForAgent(opts: {
           and(
             eq(books.tenantId, opts.tenantId),
             sql`${books.stock} > 0`,
+            isNull(books.archivedAt),
             sql`lower(${tags.name}) in (${sql.join(
               interestLike.map((t) => sql`${t}`),
               sql`, `,
@@ -310,7 +313,13 @@ export async function getBooksByIds(
       stock: books.stock,
     })
     .from(books)
-    .where(and(eq(books.tenantId, tenantId), inArray(books.id, bookIds)));
+    .where(
+      and(
+        eq(books.tenantId, tenantId),
+        inArray(books.id, bookIds),
+        isNull(books.archivedAt),
+      ),
+    );
 
   const [reserved, tagMap] = await Promise.all([
     reservedMap(tenantId, bookIds),

@@ -7,6 +7,7 @@ import {
   gte,
   ilike,
   inArray,
+  isNull,
   lte,
   or,
   sql,
@@ -333,7 +334,11 @@ export async function searchBooksForOrder(
   limit = 20,
 ): Promise<BookPickerItem[]> {
   const q = busca.trim();
-  const conditions: SQL[] = [eq(books.tenantId, tenantId), sql`${books.stock} > 0`];
+  const conditions: SQL[] = [
+    eq(books.tenantId, tenantId),
+    sql`${books.stock} > 0`,
+    isNull(books.archivedAt),
+  ];
   if (q) {
     conditions.push(
       or(

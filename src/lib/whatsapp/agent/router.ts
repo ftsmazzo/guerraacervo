@@ -1,18 +1,27 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { clientProfiles } from "@/db/schema";
+import { clientProfiles, tenants } from "@/db/schema";
 import {
+  getSuggestedBooks,
   shouldProcessMessage,
   takePendingSearch,
 } from "@/lib/whatsapp/agent/debounce";
+import { pauseBotAndNotifyHandoff } from "@/lib/whatsapp/agent/handoff";
 import { runSalesAgent } from "@/lib/whatsapp/agent/sales";
+import {
+  getWaLane,
+  looksLikeCatalogQuery,
+  parseTriageChoice,
+  replyGuestCatalog,
+  setWaLane,
+  triageMenuText,
+} from "@/lib/whatsapp/agent/triage";
 import {
   normalizePhone,
   resolveEvolutionConfig,
   sendComposing,
   sendTextMessage,
 } from "@/lib/whatsapp/evolution";
-import { softColdReply } from "@/lib/whatsapp/invite";
 import { runOnboardingFlow } from "@/lib/whatsapp/onboarding";
 import {
   findClientByWhatsapp,
@@ -30,6 +39,43 @@ function isPauseBot(text: string) {
 
 function isResumeBot(text: string) {
   return /voltar\s*bot|reativar\s*bot/i.test(text.trim());
+}
+
+function isGreeting(text: string) {
+  const t = text.trim();
+  return /^(menu|ajuda|help|oi|ol[aá]|ola|bom dia|boa tarde|boa noite)[.!?]*$/i.test(
+    t,
+  );
+}
+
+async function seboName(tenantId: string) {
+  const [row] = await db
+    .select({ name: tenants.name })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  return row?.name || "nosso sebo";
+}
+
+async function shouldSkipTriage(
+  tenantId: string,
+  phone: string,
+  text: string,
+) {
+  if (isHandoffKeyword(text) || isPauseBot(text) || isResumeBot(text)) {
+    return true;
+  }
+  if (/\b(reservar|pedido|rastreio|status|andamento)\b/i.test(text)) {
+    return true;
+  }
+  const suggested = await getSuggestedBooks(tenantId, phone);
+  if (
+    suggested.length &&
+    /^(esse|essa|este|1|2|3)([.!)])?$/i.test(text.trim())
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export async function handleInboundMessage(opts: {
@@ -56,23 +102,25 @@ export async function handleInboundMessage(opts: {
 
   void sendComposing(cfg, conn.instanceName, phone);
 
+  const text = opts.text.trim();
   const client = await findClientByWhatsapp(conn.tenantId, phone);
+
   if (!client) {
     if (!(await shouldProcessMessage(conn.tenantId, phone))) return;
-    await softColdReply({
+    await handleGuest({
+      cfg,
       tenantId: conn.tenantId,
       instanceName: conn.instanceName,
       phone,
+      text,
       pushName: opts.pushName,
     });
     return;
   }
 
   const profile = await getOrCreateClientProfile(conn.tenantId, client.id);
-  const text = opts.text.trim();
   const onboardingBusy = profile.onboardingStatus === "in_progress";
 
-  // Onboarding: sem debounce (respostas rápidas não podem sumir)
   if (!onboardingBusy) {
     if (!(await shouldProcessMessage(conn.tenantId, phone))) return;
   }
@@ -80,13 +128,15 @@ export async function handleInboundMessage(opts: {
   if (
     profile.onboardingStep === "human" &&
     (profile.onboardingStatus === "done" ||
-      profile.onboardingStatus === "skipped")
+      profile.onboardingStatus === "skipped" ||
+      profile.onboardingStatus === "pending")
   ) {
     if (isResumeBot(text)) {
       await db
         .update(clientProfiles)
         .set({ onboardingStep: "done", updatedAt: new Date() })
         .where(eq(clientProfiles.id, profile.id));
+      await setWaLane(conn.tenantId, phone, "buy");
       await sendTextMessage(
         cfg,
         conn.instanceName,
@@ -103,16 +153,6 @@ export async function handleInboundMessage(opts: {
         "Já avisei o time. Se quiser o assistente automático de novo, digite *voltar bot*.",
       );
     }
-    return;
-  }
-
-  if (profile.onboardingStatus === "pending") {
-    await softColdReply({
-      tenantId: conn.tenantId,
-      instanceName: conn.instanceName,
-      phone,
-      pushName: opts.pushName,
-    });
     return;
   }
 
@@ -138,6 +178,7 @@ export async function handleInboundMessage(opts: {
           .from(clientProfiles)
           .where(eq(clientProfiles.id, profile.id))
           .limit(1);
+        await setWaLane(conn.tenantId, phone, "buy");
         await runSalesAgent({
           cfg,
           tenantId: conn.tenantId,
@@ -155,7 +196,7 @@ export async function handleInboundMessage(opts: {
     return;
   }
 
-  if (isPauseBot(text) || isHandoffKeyword(text)) {
+  if (isPauseBot(text)) {
     await db
       .update(clientProfiles)
       .set({ onboardingStep: "human", updatedAt: new Date() })
@@ -165,9 +206,106 @@ export async function handleInboundMessage(opts: {
       cfg,
       conn.instanceName,
       phone,
-      isPauseBot(text)
-        ? `Ok${first ? `, ${first}` : ""}! Assistente pausado. Digite *voltar bot* quando quiser indicações de novo.`
-        : `Claro${first ? `, ${first}` : ""}! Vou chamar alguém do sebo. Digite *voltar bot* se quiser o assistente de volta.`,
+      `Ok${first ? `, ${first}` : ""}! Assistente pausado. Digite *voltar bot* quando quiser indicações de novo.`,
+    );
+    return;
+  }
+
+  if (isHandoffKeyword(text)) {
+    await pauseBotAndNotifyHandoff({
+      cfg,
+      tenantId: conn.tenantId,
+      instanceName: conn.instanceName,
+      phone,
+      clientName: client.name,
+      clientId: client.id,
+      profileId: profile.id,
+      preview: text,
+      reason: "atendente",
+    });
+    return;
+  }
+
+  const name = await seboName(conn.tenantId);
+  const lane = await getWaLane(conn.tenantId, phone);
+  const choice = parseTriageChoice(text);
+  const inTriage = !lane || lane === "awaiting";
+  const numericPick = /^[123]$/.test(text.trim());
+
+  if (isGreeting(text) && !choice) {
+    await setWaLane(conn.tenantId, phone, "awaiting");
+    await sendTextMessage(
+      cfg,
+      conn.instanceName,
+      phone,
+      triageMenuText(name),
+    );
+    return;
+  }
+
+  if (choice === "sell" && (inTriage || !numericPick)) {
+    await pauseBotAndNotifyHandoff({
+      cfg,
+      tenantId: conn.tenantId,
+      instanceName: conn.instanceName,
+      phone,
+      clientName: client.name,
+      clientId: client.id,
+      profileId: profile.id,
+      preview: text,
+      reason: "sell",
+    });
+    return;
+  }
+
+  if (inTriage && (choice === "buy" || choice === "catalog")) {
+    await setWaLane(conn.tenantId, phone, choice);
+    if (choice === "catalog") {
+      await runSalesAgent({
+        cfg,
+        tenantId: conn.tenantId,
+        instanceName: conn.instanceName,
+        phone,
+        clientId: client.id,
+        clientName: client.name,
+        profileId: profile.id,
+        budgetMin: profile.budgetMin,
+        budgetMax: profile.budgetMax,
+        text: "indicações",
+      });
+      return;
+    }
+    await sendTextMessage(
+      cfg,
+      conn.instanceName,
+      phone,
+      `Beleza. Me fala um autor, um título ou um tema — ou *indicações* que eu puxo do seu gosto.`,
+    );
+    return;
+  }
+
+  const skip = await shouldSkipTriage(conn.tenantId, phone, text);
+  if (!lane && !skip) {
+    if (looksLikeCatalogQuery(text)) {
+      await setWaLane(conn.tenantId, phone, "buy");
+    } else {
+      await setWaLane(conn.tenantId, phone, "awaiting");
+      await sendTextMessage(
+        cfg,
+        conn.instanceName,
+        phone,
+        triageMenuText(name),
+      );
+      return;
+    }
+  }
+
+  if (lane === "awaiting" && !skip && !looksLikeCatalogQuery(text)) {
+    await sendTextMessage(
+      cfg,
+      conn.instanceName,
+      phone,
+      triageMenuText(name),
     );
     return;
   }
@@ -184,4 +322,96 @@ export async function handleInboundMessage(opts: {
     budgetMax: profile.budgetMax,
     text,
   });
+}
+
+async function handleGuest(opts: {
+  cfg: NonNullable<ReturnType<typeof resolveEvolutionConfig>>;
+  tenantId: string;
+  instanceName: string;
+  phone: string;
+  text: string;
+  pushName?: string;
+}) {
+  const name = await seboName(opts.tenantId);
+  const display = opts.pushName?.trim() || opts.phone;
+  const lane = await getWaLane(opts.tenantId, opts.phone);
+  const choice = parseTriageChoice(opts.text);
+  const inTriage = !lane || lane === "awaiting";
+  const numericPick = /^[123]$/.test(opts.text.trim());
+
+  if (isGreeting(opts.text) && !choice) {
+    await setWaLane(opts.tenantId, opts.phone, "awaiting");
+    await sendTextMessage(
+      opts.cfg,
+      opts.instanceName,
+      opts.phone,
+      triageMenuText(name),
+    );
+    return;
+  }
+
+  if (choice === "sell" && (inTriage || !numericPick)) {
+    await pauseBotAndNotifyHandoff({
+      cfg: opts.cfg,
+      tenantId: opts.tenantId,
+      instanceName: opts.instanceName,
+      phone: opts.phone,
+      clientName: display,
+      preview: opts.text,
+      reason: "sell",
+    });
+    return;
+  }
+
+  if (inTriage && (choice === "buy" || choice === "catalog")) {
+    await setWaLane(opts.tenantId, opts.phone, choice);
+    if (choice === "catalog") {
+      await replyGuestCatalog({
+        cfg: opts.cfg,
+        instanceName: opts.instanceName,
+        tenantId: opts.tenantId,
+        phone: opts.phone,
+        query: "",
+      });
+      return;
+    }
+    await sendTextMessage(
+      opts.cfg,
+      opts.instanceName,
+      opts.phone,
+      "Me fala um autor, um título ou um tema que eu olho no acervo.\nReserva só depois do cadastro no sebo.",
+    );
+    return;
+  }
+
+  if (lane === "buy" || lane === "catalog") {
+    await replyGuestCatalog({
+      cfg: opts.cfg,
+      instanceName: opts.instanceName,
+      tenantId: opts.tenantId,
+      phone: opts.phone,
+      query: opts.text,
+    });
+    return;
+  }
+
+  if (lane === "awaiting" && looksLikeCatalogQuery(opts.text)) {
+    await setWaLane(opts.tenantId, opts.phone, "catalog");
+    await replyGuestCatalog({
+      cfg: opts.cfg,
+      instanceName: opts.instanceName,
+      tenantId: opts.tenantId,
+      phone: opts.phone,
+      query: opts.text,
+    });
+    return;
+  }
+
+  await setWaLane(opts.tenantId, opts.phone, "awaiting");
+  await sendTextMessage(
+    opts.cfg,
+    opts.instanceName,
+    opts.phone,
+    triageMenuText(name),
+  );
 }

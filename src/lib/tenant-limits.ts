@@ -1,4 +1,4 @@
-import { count, eq } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { books } from "@/db/schema";
 import { getPlan, planHas, type Entitlement } from "@/lib/plans";
@@ -7,7 +7,7 @@ export async function countTenantBooks(tenantId: string): Promise<number> {
   const [row] = await db
     .select({ value: count() })
     .from(books)
-    .where(eq(books.tenantId, tenantId));
+    .where(and(eq(books.tenantId, tenantId), isNull(books.archivedAt)));
   return Number(row?.value ?? 0);
 }
 

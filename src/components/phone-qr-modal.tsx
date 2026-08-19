@@ -18,10 +18,8 @@ export function PhoneQrModal({ open, onClose, onIsbn, onCoverPhoto }: Props) {
   const closedRef = useRef(false);
   const onIsbnRef = useRef(onIsbn);
   const onCoverRef = useRef(onCoverPhoto);
-  const onCloseRef = useRef(onClose);
   onIsbnRef.current = onIsbn;
   onCoverRef.current = onCoverPhoto;
-  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) {
@@ -64,16 +62,12 @@ export function PhoneQrModal({ open, onClose, onIsbn, onCoverPhoto }: Props) {
               return;
             }
             if (body.pending) return;
-            if (pollRef.current) clearInterval(pollRef.current);
-            pollRef.current = null;
             if (body.type === "isbn" && body.code) {
-              setStatus("ISBN recebido!");
+              setStatus("ISBN recebido. Pode ler o próximo no celular.");
               onIsbnRef.current(String(body.code));
-              onCloseRef.current();
             } else if (body.type === "photo" && body.imageBase64) {
-              setStatus("Foto recebida!");
+              setStatus("Foto recebida. Pode fotografar o próximo.");
               onCoverRef.current(String(body.imageBase64));
-              onCloseRef.current();
             }
           } catch {
             /* ignore transient poll errors */
@@ -117,8 +111,12 @@ export function PhoneQrModal({ open, onClose, onIsbn, onCoverPhoto }: Props) {
           </button>
         </div>
         <p className="phone-qr-help">
-          Escaneie com a câmera do celular. O aparelho só lê o código ou a capa —
-          o formulário continua neste computador.
+          Escaneie com a câmera do celular. O QR vale 10 minutos: leia um livro,
+          cadastre neste computador e leia o próximo sem gerar outro código.
+        </p>
+        <p className="phone-qr-help">
+          Se o PrismaBook já está no celular, abra <strong>Novo livro</strong> e
+          use a câmera — não precisa deste QR.
         </p>
         {error ? <div className="phone-qr-error">{error}</div> : null}
         <div className="phone-qr-frame">

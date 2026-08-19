@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { runArchiveSoldBooks } from "@/lib/books/archive-sold";
-import { runReadingReminders } from "@/lib/reading/reminders";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,11 +18,8 @@ async function handle(req: Request) {
   if (!authorized(req)) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
-  const [reminders, archived] = await Promise.all([
-    runReadingReminders(),
-    runArchiveSoldBooks(),
-  ]);
-  return NextResponse.json({ ok: true, reminders, archived });
+  const result = await runArchiveSoldBooks();
+  return NextResponse.json({ ok: true, ...result });
 }
 
 export async function GET(req: Request) {
