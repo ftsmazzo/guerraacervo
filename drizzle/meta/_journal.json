@@ -64,6 +64,13 @@
       "when": 1787000001000,
       "tag": "0008_library_loans",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787000002000,
+      "tag": "0009_loan_condition_photos",
+      "breakpoints": true
     }
   ]
 }

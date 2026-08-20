@@ -13,6 +13,10 @@ import {
   type LibraryPolicy,
 } from "@/lib/library/policy";
 import {
+  normalizeLoanCondition,
+  normalizeLoanPhoto,
+} from "@/lib/library/condition";
+import {
   searchCopiesOrTitles,
   searchReaders,
 } from "@/lib/library/queries";
@@ -128,11 +132,22 @@ export async function checkoutLoan(input: {
   clientId: string;
   copyId?: string;
   bookId?: string;
+  photoUrl?: string | null;
+  condition?: unknown;
 }): Promise<LoanActionResult> {
   const gate = await requireLibraryWrite();
   if (!gate.ok) return gate;
   const tenantId = gate.ctx.tenant.id;
   const policy = await loadPolicy(tenantId);
+
+  let photoUrl: string | null = null;
+  let condition = null;
+  try {
+    photoUrl = normalizeLoanPhoto(input.photoUrl);
+    condition = normalizeLoanCondition(input.condition);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
 
   const [reader] = await db
     .select({ id: clients.id, name: clients.name })
@@ -199,6 +214,8 @@ export async function checkoutLoan(input: {
         borrowedAt: now,
         dueAt,
         status: "open",
+        checkoutPhotoUrl: photoUrl,
+        checkoutCondition: condition,
       })
       .returning({ id: loans.id });
 
@@ -217,15 +234,19 @@ export async function checkoutLoan(input: {
   }
 }
 
-export async function returnLoan(loanId: string): Promise<LoanActionResult> {
+export async function returnLoan(
+  loanId: string,
+  opts?: { photoUrl?: string | null; condition?: unknown },
+): Promise<LoanActionResult> {
   const gate = await requireLibraryWrite();
   if (!gate.ok) return gate;
-  return returnLoanInternal(gate.ctx.tenant.id, loanId);
+  return returnLoanInternal(gate.ctx.tenant.id, loanId, opts);
 }
 
 export async function returnLoanInternal(
   tenantId: string,
   loanId: string,
+  opts?: { photoUrl?: string | null; condition?: unknown },
 ): Promise<LoanActionResult> {
   const [loan] = await db
     .select()
@@ -237,12 +258,23 @@ export async function returnLoanInternal(
     return { ok: false, error: "Este empréstimo já foi devolvido." };
   }
 
+  let photoUrl: string | null = null;
+  let condition = null;
+  try {
+    photoUrl = normalizeLoanPhoto(opts?.photoUrl);
+    condition = normalizeLoanCondition(opts?.condition);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+
   const now = new Date();
   await db
     .update(loans)
     .set({
       returnedAt: now,
       status: "returned",
+      returnPhotoUrl: photoUrl,
+      returnCondition: condition,
       updatedAt: now,
     })
     .where(eq(loans.id, loan.id));

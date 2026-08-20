@@ -1506,6 +1506,15 @@ export function BookForm({
                           </li>
                         ))}
                       </ul>
+                      <p style={{ marginTop: "0.5rem" }}>
+                        <Link
+                          href={`/painel/livros/${initial!.id}/etiquetas`}
+                          className="text-sm"
+                          style={{ textDecoration: "underline" }}
+                        >
+                          Imprimir etiquetas dos exemplares
+                        </Link>
+                      </p>
                     </div>
                   ) : null}
                 </div>

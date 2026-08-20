@@ -11,8 +11,14 @@ import {
   searchCirculationCopies,
   searchCirculationReaders,
 } from "@/lib/library/actions";
+import {
+  EMPTY_LOAN_CONDITION,
+  LOAN_CONDITION_LABELS,
+  fileToLoanPhotoDataUrl,
+} from "@/lib/library/condition";
 import type { CirculationLoan, CopySearchHit, ReaderSearchHit } from "@/lib/library/queries";
 import type { LibraryPolicy } from "@/lib/library/policy";
+import type { LoanConditionCheck } from "@/db/schema";
 
 function fmtDate(d: Date | string) {
   const dt = d instanceof Date ? d : new Date(d);
@@ -24,6 +30,97 @@ function dueClass(loan: CirculationLoan) {
   const ms = new Date(loan.dueAt).getTime() - Date.now();
   if (ms < 1000 * 60 * 60 * 24) return "text-amber-800";
   return "text-muted";
+}
+
+function ConditionChecklist({
+  value,
+  onChange,
+  photo,
+  onPhoto,
+  title,
+}: {
+  value: LoanConditionCheck;
+  onChange: (next: LoanConditionCheck) => void;
+  photo: string | null;
+  onPhoto: (dataUrl: string | null) => void;
+  title: string;
+}) {
+  return (
+    <div className="mt-3 rounded-md border border-line p-3">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
+        {title}
+      </h3>
+      <p className="mt-1 text-xs text-muted">
+        Folheada rápida + foto do livro (opcional, mas recomendada).
+      </p>
+      <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+        {LOAN_CONDITION_LABELS.map(({ key, label }) => (
+          <label key={key} className="flex items-center gap-2 text-sm text-ink">
+            <input
+              type="checkbox"
+              checked={value[key]}
+              onChange={(e) =>
+                onChange({ ...value, [key]: e.target.checked })
+              }
+            />
+            {label}
+          </label>
+        ))}
+      </div>
+      <label className="mt-2 block text-sm">
+        Observação
+        <input
+          className="form-control mt-1"
+          value={value.notes}
+          maxLength={500}
+          placeholder="Ex.: canto amassado na capa"
+          onChange={(e) => onChange({ ...value, notes: e.target.value })}
+        />
+      </label>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <label className="btn-outline cursor-pointer text-xs">
+          Tirar / escolher foto
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (!file) return;
+              void (async () => {
+                try {
+                  onPhoto(await fileToLoanPhotoDataUrl(file));
+                } catch (err) {
+                  alert(
+                    err instanceof Error ? err.message : "Falha na foto",
+                  );
+                }
+              })();
+            }}
+          />
+        </label>
+        {photo ? (
+          <button
+            type="button"
+            className="text-xs text-muted underline"
+            onClick={() => onPhoto(null)}
+          >
+            Remover foto
+          </button>
+        ) : null}
+      </div>
+      {photo ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={photo}
+          alt="Conferência"
+          className="mt-2 max-h-40 rounded border border-line object-contain"
+        />
+      ) : null}
+    </div>
+  );
 }
 
 export function CirculationDesk({
@@ -47,6 +144,16 @@ export function CirculationDesk({
   const [bookQ, setBookQ] = useState("");
   const [copies, setCopies] = useState<CopySearchHit[]>([]);
   const [copy, setCopy] = useState<CopySearchHit | null>(null);
+
+  const [checkoutCondition, setCheckoutCondition] =
+    useState<LoanConditionCheck>({ ...EMPTY_LOAN_CONDITION });
+  const [checkoutPhoto, setCheckoutPhoto] = useState<string | null>(null);
+
+  const [returnLoanId, setReturnLoanId] = useState<string | null>(null);
+  const [returnCondition, setReturnCondition] = useState<LoanConditionCheck>({
+    ...EMPTY_LOAN_CONDITION,
+  });
+  const [returnPhoto, setReturnPhoto] = useState<string | null>(null);
 
   const [loanDays, setLoanDays] = useState(String(policy.loanDays));
   const [maxOpen, setMaxOpen] = useState(String(policy.maxOpenLoans));
@@ -89,6 +196,8 @@ export function CirculationDesk({
         clientId: reader.id,
         copyId: copy.copyId || undefined,
         bookId: copy.bookId,
+        photoUrl: checkoutPhoto,
+        condition: checkoutCondition,
       });
       if (!res.ok) {
         setError(res.error);
@@ -100,6 +209,33 @@ export function CirculationDesk({
       setCopy(null);
       setBookQ("");
       setCopies([]);
+      setCheckoutCondition({ ...EMPTY_LOAN_CONDITION });
+      setCheckoutPhoto(null);
+      router.refresh();
+    });
+  }
+
+  function openReturn(loanId: string) {
+    setReturnLoanId(loanId);
+    setReturnCondition({ ...EMPTY_LOAN_CONDITION });
+    setReturnPhoto(null);
+    setError(null);
+  }
+
+  function confirmReturn() {
+    if (!returnLoanId) return;
+    setError(null);
+    start(async () => {
+      const res = await returnLoan(returnLoanId, {
+        photoUrl: returnPhoto,
+        condition: returnCondition,
+      });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setOkMsg("Devolvido com conferência.");
+      setReturnLoanId(null);
       router.refresh();
     });
   }
@@ -121,7 +257,7 @@ export function CirculationDesk({
         <h2 className="text-sm font-semibold text-ink">1 · Leitor</h2>
         <input
           className="form-control mt-2"
-          placeholder="Nome ou WhatsApp…"
+          placeholder="Buscar por nome, WhatsApp ou e-mail…"
           value={readerQ}
           onChange={(e) => runSearchReaders(e.target.value)}
         />
@@ -131,21 +267,19 @@ export function CirculationDesk({
               <li key={r.id}>
                 <button
                   type="button"
-                  className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm ${reader?.id === r.id ? "bg-accent-soft" : ""}`}
-                  onClick={() => {
-                    setReader(r);
-                    setReaders([]);
-                    setReaderQ(r.name);
-                  }}
+                  className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm ${
+                    reader?.id === r.id ? "bg-accent-soft" : "hover:bg-bg"
+                  }`}
+                  onClick={() => setReader(r)}
                 >
                   <span>
-                    {r.name}
+                    <strong>{r.name}</strong>
                     {r.whatsapp ? (
                       <span className="text-muted"> · {r.whatsapp}</span>
                     ) : null}
                   </span>
                   <span className="text-xs text-muted">
-                    {r.openLoans} aberto{r.openLoans === 1 ? "" : "s"}
+                    {r.openLoans} aberto(s)
                   </span>
                 </button>
               </li>
@@ -155,60 +289,60 @@ export function CirculationDesk({
         {reader ? (
           <p className="mt-2 text-sm text-ink">
             Selecionado: <strong>{reader.name}</strong>
-            {reader.whatsapp ? ` · ${reader.whatsapp}` : ""}
           </p>
-        ) : (
-          <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-            <input
-              className="form-control"
-              placeholder="Cadastrar: nome"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-            />
-            <input
-              className="form-control"
-              placeholder="WhatsApp"
-              value={newWa}
-              onChange={(e) => setNewWa(e.target.value)}
-            />
-            <button
-              type="button"
-              className="btn-outline"
-              disabled={pending || !newName.trim()}
-              onClick={() => {
-                setError(null);
-                start(async () => {
-                  const res = await quickCreateReader({
-                    nome: newName,
-                    whatsapp: newWa,
-                    optIn: true,
-                  });
-                  if (!res.ok) {
-                    setError(res.error);
-                    return;
-                  }
-                  setReader({
-                    id: res.id,
-                    name: newName,
-                    whatsapp: newWa.replace(/\D/g, "") || null,
-                    email: null,
-                    openLoans: 0,
-                  });
-                  setReaderQ(newName);
-                  setNewName("");
-                  setNewWa("");
-                  setOkMsg("Leitor cadastrado (avisos no WhatsApp ligados).");
+        ) : null}
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+          <input
+            className="form-control"
+            placeholder="Novo leitor — nome"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+          />
+          <input
+            className="form-control"
+            placeholder="WhatsApp (opcional)"
+            value={newWa}
+            onChange={(e) => setNewWa(e.target.value)}
+          />
+          <button
+            type="button"
+            className="btn-outline"
+            disabled={pending || newName.trim().length < 2}
+            onClick={() => {
+              setError(null);
+              start(async () => {
+                const res = await quickCreateReader({
+                  nome: newName,
+                  whatsapp: newWa || null,
                 });
-              }}
-            >
-              Cadastrar
-            </button>
-          </div>
-        )}
+                if (!res.ok) {
+                  setError(res.error);
+                  return;
+                }
+                setReader({
+                  id: res.id,
+                  name: newName.trim(),
+                  whatsapp: newWa.replace(/\D/g, "") || null,
+                  email: null,
+                  openLoans: 0,
+                });
+                setNewName("");
+                setNewWa("");
+                setOkMsg("Leitor criado.");
+                router.refresh();
+              });
+            }}
+          >
+            Criar
+          </button>
+        </div>
       </section>
 
       <section className="rounded-lg border border-line bg-card p-4">
-        <h2 className="text-sm font-semibold text-ink">2 · Livro ou código do exemplar</h2>
+        <h2 className="text-sm font-semibold text-ink">
+          2 · Livro ou código do exemplar
+        </h2>
         <input
           className="form-control mt-2"
           placeholder="Título, ISBN ou código do exemplar…"
@@ -218,29 +352,29 @@ export function CirculationDesk({
         {copies.length ? (
           <ul className="mt-2 divide-y divide-line rounded-md border border-line">
             {copies.map((c) => (
-              <li key={c.copyId || c.bookId}>
+              <li key={`${c.bookId}-${c.copyId || "title"}`}>
                 <button
                   type="button"
+                  className={`flex w-full items-start justify-between gap-2 px-3 py-2 text-left text-sm ${
+                    copy?.bookId === c.bookId && copy?.copyId === c.copyId
+                      ? "bg-accent-soft"
+                      : "hover:bg-bg"
+                  }`}
+                  onClick={() => setCopy(c)}
                   disabled={c.availableCount < 1}
-                  className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm disabled:opacity-50 ${copy?.copyId === c.copyId ? "bg-accent-soft" : ""}`}
-                  onClick={() => {
-                    setCopy(c);
-                    setCopies([]);
-                    setBookQ(c.title);
-                  }}
                 >
                   <span>
-                    {c.title}
+                    <strong>{c.title}</strong>
                     {c.author ? (
-                      <span className="text-muted"> — {c.author}</span>
+                      <span className="text-muted"> · {c.author}</span>
                     ) : null}
                     {c.barcode ? (
-                      <span className="ml-2 font-mono text-xs text-muted">
+                      <div className="font-mono text-xs text-muted">
                         {c.barcode}
-                      </span>
+                      </div>
                     ) : null}
                   </span>
-                  <span className="text-xs text-muted">
+                  <span className="shrink-0 text-xs text-muted">
                     {c.availableCount} disp.
                   </span>
                 </button>
@@ -257,11 +391,20 @@ export function CirculationDesk({
       </section>
 
       <section className="rounded-lg border border-line bg-card p-4">
-        <h2 className="text-sm font-semibold text-ink">3 · Confirmar</h2>
+        <h2 className="text-sm font-semibold text-ink">3 · Confirmar entrega</h2>
         <p className="mt-1 text-sm text-muted">
           Prazo padrão: {policy.loanDays} dia(s) · até {policy.maxOpenLoans}{" "}
           empréstimos · {policy.maxRenewals} renovação(ões).
         </p>
+        {reader && copy ? (
+          <ConditionChecklist
+            title="Conferência na entrega"
+            value={checkoutCondition}
+            onChange={setCheckoutCondition}
+            photo={checkoutPhoto}
+            onPhoto={setCheckoutPhoto}
+          />
+        ) : null}
         <button
           type="button"
           className="btn-accent mt-3"
@@ -328,17 +471,7 @@ export function CirculationDesk({
                         type="button"
                         className="btn-accent text-xs"
                         disabled={pending}
-                        onClick={() => {
-                          setError(null);
-                          start(async () => {
-                            const res = await returnLoan(loan.id);
-                            if (!res.ok) setError(res.error);
-                            else {
-                              setOkMsg("Devolvido.");
-                              router.refresh();
-                            }
-                          });
-                        }}
+                        onClick={() => openReturn(loan.id)}
                       >
                         Devolver
                       </button>
@@ -349,6 +482,38 @@ export function CirculationDesk({
             </table>
           </div>
         )}
+
+        {returnLoanId ? (
+          <div className="mt-4 rounded-md border border-line p-3">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-ink">
+                Conferência na devolução
+              </h3>
+              <button
+                type="button"
+                className="text-xs text-muted underline"
+                onClick={() => setReturnLoanId(null)}
+              >
+                Cancelar
+              </button>
+            </div>
+            <ConditionChecklist
+              title="Estado do exemplar ao devolver"
+              value={returnCondition}
+              onChange={setReturnCondition}
+              photo={returnPhoto}
+              onPhoto={setReturnPhoto}
+            />
+            <button
+              type="button"
+              className="btn-accent mt-3"
+              disabled={pending}
+              onClick={confirmReturn}
+            >
+              {pending ? "Salvando…" : "Confirmar devolução"}
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <details className="rounded-lg border border-line bg-card p-4 text-sm">

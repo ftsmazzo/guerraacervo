@@ -473,6 +473,15 @@ export const loanStatusEnum = pgEnum("loan_status", [
   "returned",
 ]);
 
+/** Conferência rápida na entrega / devolução (balcão). */
+export type LoanConditionCheck = {
+  tornPages: boolean;
+  missingPages: boolean;
+  marksOrStains: boolean;
+  coverDamage: boolean;
+  notes: string;
+};
+
 export const copies = pgTable(
   "copies",
   {
@@ -514,5 +523,10 @@ export const loans = pgTable("loans", {
   returnedAt: timestamp("returned_at", { withTimezone: true }),
   renewedCount: integer("renewed_count").notNull().default(0),
   status: loanStatusEnum("status").notNull().default("open"),
+  checkoutPhotoUrl: text("checkout_photo_url"),
+  returnPhotoUrl: text("return_photo_url"),
+  checkoutCondition: jsonb("checkout_condition").$type<LoanConditionCheck | null>(),
+  returnCondition: jsonb("return_condition").$type<LoanConditionCheck | null>(),
   ...timestamps,
 });
+

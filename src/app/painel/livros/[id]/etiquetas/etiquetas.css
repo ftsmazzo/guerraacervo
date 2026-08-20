@@ -1,0 +1,105 @@
+.labels-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem 2rem;
+}
+
+.labels-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+}
+
+.labels-toolbar h1 {
+  font-size: 1.15rem;
+  margin: 0 0 0.35rem;
+}
+
+.labels-toolbar p {
+  margin: 0;
+  color: var(--muted, #64748b);
+  font-size: 0.9rem;
+  max-width: 36rem;
+}
+
+.labels-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.labels-sheet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.label-card {
+  border: 1px solid #111;
+  border-radius: 4px;
+  padding: 0.65rem 0.75rem;
+  background: #fff;
+  color: #111;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.label-library {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.label-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+  margin-top: 0.25rem;
+  line-height: 1.25;
+}
+
+.label-author {
+  font-size: 0.8rem;
+  margin-top: 0.15rem;
+}
+
+.label-code {
+  margin-top: 0.55rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.label-meta {
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  opacity: 0.8;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .labels-page {
+    max-width: none;
+    padding: 0;
+  }
+
+  .labels-sheet {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.4cm;
+  }
+
+  .label-card {
+    border-width: 1.5pt;
+  }
+
+  body {
+    background: #fff !important;
+  }
+}
