@@ -149,10 +149,17 @@ export function BookForm({
   initial,
   personal = false,
   library = false,
+  copies = [],
 }: {
   initial?: BookFormInitial;
   personal?: boolean;
   library?: boolean;
+  copies?: Array<{
+    id: string;
+    barcode: string;
+    status: string;
+    location: string | null;
+  }>;
 }) {
   const router = useRouter();
   const isEdit = Boolean(initial?.id);
@@ -719,12 +726,17 @@ export function BookForm({
     setPhoneQrOpen(true);
   }
 
-  function resetForNextBook() {
+  function resetForNextBook(opts?: { keepPhoneQr?: boolean }) {
+    const keepPhoneQr = Boolean(opts?.keepPhoneQr) || phoneQrOpen;
     setPocketSavedTitle(null);
     setError(null);
     setIsbnBusca("");
     setSrc({});
-    setIsbnMsg(null);
+    setIsbnMsg(
+      keepPhoneQr
+        ? "Pronto para o próximo. No celular, fotografe ou leia o ISBN — o mesmo QR continua válido."
+        : null,
+    );
     setShowProgress(false);
     setIsbn("");
     setLocation("");
@@ -749,9 +761,12 @@ export function BookForm({
     setTagInput("");
     setTagSugest([]);
     setAiQuery("");
+    if (keepPhoneQr) setPhoneQrOpen(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
-    // reabre câmera no próximo tick
-    setTimeout(() => openCapture("barcode"), 350);
+    // Câmera do notebook só no modo bolso; com QR o celular é a fonte
+    if (pocket && !keepPhoneQr) {
+      setTimeout(() => openCapture("barcode"), 350);
+    }
   }
 
   useEffect(() => {
@@ -806,8 +821,21 @@ export function BookForm({
           setError(result.error);
           return;
         }
-        if (pocket && !isEdit) {
-          setPocketSavedTitle(title || "Livro");
+        // Novo livro: permanece na tela. Com QR aberto, o celular segue
+        // enviando fotos no mesmo código (sem entrar e sair).
+        if (!isEdit) {
+          if (pocket) {
+            setPocketSavedTitle(title || "Livro");
+            return;
+          }
+          const keepQr = phoneQrOpen;
+          const saved = title || "Livro";
+          resetForNextBook({ keepPhoneQr: keepQr });
+          setIsbnMsg(
+            keepQr
+              ? `“${saved}” salvo. No celular, fotografe o próximo — o mesmo QR continua válido.`
+              : `“${saved}” salvo. Pronto para cadastrar o próximo.`,
+          );
           return;
         }
         router.push("/painel/livros");
@@ -848,7 +876,7 @@ export function BookForm({
             <button
               type="button"
               className="btn-accent pocket-cta"
-              onClick={resetForNextBook}
+              onClick={() => resetForNextBook()}
             >
               Cadastrar outro
             </button>
@@ -1448,6 +1476,38 @@ export function BookForm({
                       número.
                     </div>
                   )}
+                  {library && isEdit && copies.length > 0 ? (
+                    <div
+                      className="form-text"
+                      style={{ marginTop: "0.75rem" }}
+                    >
+                      <strong>Códigos dos exemplares</strong>
+                      <ul
+                        style={{
+                          margin: "0.35rem 0 0",
+                          paddingLeft: "1.1rem",
+                          fontFamily: "ui-monospace, monospace",
+                          fontSize: "0.85rem",
+                        }}
+                      >
+                        {copies.map((c) => (
+                          <li key={c.id}>
+                            {c.barcode}
+                            <span style={{ opacity: 0.7 }}>
+                              {" "}
+                              ·{" "}
+                              {c.status === "available"
+                                ? "disponível"
+                                : c.status === "on_loan"
+                                  ? "emprestado"
+                                  : c.status}
+                              {c.location ? ` · ${c.location}` : ""}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </div>
                 </>
                 )}

@@ -36,6 +36,11 @@ export type NewBookNotifyJob = {
 };
 
 export async function enqueueNewBookNotice(job: NewBookNotifyJob) {
+  // Desligado de propósito: cadastro de livro não dispara WhatsApp em massa.
+  // Reative só com WA_NEW_BOOK_NOTICES=1 (opt-in explícito do operador).
+  if (process.env.WA_NEW_BOOK_NOTICES?.trim() !== "1") {
+    return;
+  }
   try {
     const redis = getRedis();
     if (redis.status !== "ready") await redis.connect().catch(() => null);
@@ -167,10 +172,17 @@ export async function drainNotifyQueue(max = 20) {
     }
   }
 
+  // Sem flag, esvazia a fila antiga sem enviar (fim do blast invasivo).
+  const noticesEnabled = process.env.WA_NEW_BOOK_NOTICES?.trim() === "1";
+
   let processed = 0;
   for (let i = 0; i < max; i++) {
     const raw = await redis.rpop(QUEUE_KEY);
     if (!raw) break;
+    if (!noticesEnabled) {
+      processed += 1;
+      continue;
+    }
     try {
       const job = JSON.parse(raw) as NewBookNotifyJob;
       if (job.type !== "new_book") continue;

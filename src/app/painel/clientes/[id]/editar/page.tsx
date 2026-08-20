@@ -19,5 +19,10 @@ export default async function EditarClientePage({
   const client = await getClient(ctx.tenant.id, id);
   if (!client) notFound();
 
-  return <ClientForm initial={client} />;
+  return (
+    <ClientForm
+      initial={client}
+      library={ctx.tenant.product === "library"}
+    />
+  );
 }

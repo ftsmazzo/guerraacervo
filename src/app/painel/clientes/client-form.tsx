@@ -33,9 +33,10 @@ function formatDt(d: Date | string) {
 
 type Props = {
   initial?: ClientDetail | null;
+  library?: boolean;
 };
 
-export function ClientForm({ initial }: Props) {
+export function ClientForm({ initial, library = false }: Props) {
   const router = useRouter();
   const isEdit = Boolean(initial?.id);
   const [pending, start] = useTransition();
@@ -54,6 +55,9 @@ export function ClientForm({ initial }: Props) {
   const [cidade, setCidade] = useState(initial?.city ?? "");
   const [estado, setEstado] = useState(initial?.state ?? "");
   const [observacoes, setObservacoes] = useState(initial?.notes ?? "");
+
+  const personLabel = library ? "leitor" : "cliente";
+  const listLabel = library ? "Leitores" : "Clientes";
 
   async function buscarCep() {
     const digits = cep.replace(/\D/g, "");
@@ -92,13 +96,13 @@ export function ClientForm({ initial }: Props) {
       cpf: cpf || null,
       whatsapp: whatsapp || null,
       email: email || null,
-      cep: cep || null,
-      logradouro: logradouro || null,
-      numero: numero || null,
-      complemento: complemento || null,
-      bairro: bairro || null,
-      cidade: cidade || null,
-      estado: estado || null,
+      cep: library ? null : cep || null,
+      logradouro: library ? null : logradouro || null,
+      numero: library ? null : numero || null,
+      complemento: library ? null : complemento || null,
+      bairro: library ? null : bairro || null,
+      cidade: library ? null : cidade || null,
+      estado: library ? null : estado || null,
       observacoes: observacoes || null,
     };
 
@@ -119,9 +123,17 @@ export function ClientForm({ initial }: Props) {
     <div className="clientes-page">
       <div className="page-header">
         <div>
-          <h4>{isEdit ? "Editar Cliente" : "Novo Cliente"}</h4>
+          <h4>
+            {isEdit
+              ? library
+                ? "Editar leitor"
+                : "Editar Cliente"
+              : library
+                ? "Novo leitor"
+                : "Novo Cliente"}
+          </h4>
           <p className="breadcrumb">
-            <Link href="/painel/clientes">Clientes</Link>
+            <Link href="/painel/clientes">{listLabel}</Link>
             {" / "}
             {isEdit ? "Editar" : "Novo"}
           </p>
@@ -151,7 +163,7 @@ export function ClientForm({ initial }: Props) {
                       required
                       value={nome}
                       onChange={(e) => setNome(e.target.value)}
-                      placeholder="Nome completo do cliente"
+                      placeholder={`Nome completo do ${personLabel}`}
                     />
                   </div>
                   <div>
@@ -193,6 +205,7 @@ export function ClientForm({ initial }: Props) {
               </div>
             </div>
 
+            {library ? null : (
             <div className="card">
               <div className="card-header">
                 <span className="card-title-icon">●</span> Endereço (para envio
@@ -289,6 +302,7 @@ export function ClientForm({ initial }: Props) {
                 </div>
               </div>
             </div>
+            )}
           </div>
 
           <div>
@@ -302,7 +316,11 @@ export function ClientForm({ initial }: Props) {
                   rows={5}
                   value={observacoes}
                   onChange={(e) => setObservacoes(e.target.value)}
-                  placeholder="Anotações sobre o cliente…"
+                  placeholder={
+                    library
+                      ? "Anotações sobre o leitor…"
+                      : "Anotações sobre o cliente…"
+                  }
                 />
               </div>
             </div>

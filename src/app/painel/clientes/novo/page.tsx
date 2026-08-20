@@ -10,5 +10,5 @@ export default async function NovoClientePage() {
     redirect("/painel/clientes");
   }
 
-  return <ClientForm />;
+  return <ClientForm library={ctx.tenant.product === "library"} />;
 }

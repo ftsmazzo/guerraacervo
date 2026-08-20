@@ -162,14 +162,17 @@ export async function runOnboardingFlow(opts: {
     const b = parseBudget(text);
     profilePatch.budgetMin = b.min;
     profilePatch.budgetMax = b.max;
+    // Avisos proativos de livro novo no Zap foram desligados (invasivos).
+    profilePatch.optInNotices = false;
     reply =
-      `4) Posso te avisar no WhatsApp quando entrar *livro novo* no seu gosto? (sim/não)`;
-    nextStep = "optin";
+      `Perfil pronto. Quando quiser, peça *indicações*, busque um título ou diga *menu* — eu respondo por aqui.`;
+    nextStep = "done";
+    onboardingStatus = "done";
   } else if (step === "optin") {
-    profilePatch.optInNotices = !isNo(text);
-    reply = isNo(text)
-      ? `Tudo bem! Perfil pronto. Pode pedir *indicações*, buscar um título ou *menu*.`
-      : `Combinado! Vou te avisar das novidades. Perfil pronto — peça *indicações* ou diga o que procura 📖`;
+    // Fluxo antigo (ainda em andamento): não promete blast de novidades.
+    profilePatch.optInNotices = false;
+    reply =
+      `Perfil pronto. Peça *indicações* ou diga o que procura — eu respondo quando você perguntar.`;
     nextStep = "done";
     onboardingStatus = "done";
   } else {

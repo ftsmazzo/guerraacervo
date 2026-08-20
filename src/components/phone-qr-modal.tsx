@@ -111,8 +111,9 @@ export function PhoneQrModal({ open, onClose, onIsbn, onCoverPhoto }: Props) {
           </button>
         </div>
         <p className="phone-qr-help">
-          Escaneie com a câmera do celular. O QR vale 10 minutos: leia um livro,
-          cadastre neste computador e leia o próximo sem gerar outro código.
+          Escaneie <strong>uma vez</strong> com a câmera do celular. O QR vale
+          10 minutos e renova a cada foto: cadastre o livro neste computador e
+          fotografe o próximo no celular — sem fechar nem gerar outro código.
         </p>
         <p className="phone-qr-help">
           Se o PrismaBook já está no celular, abra <strong>Novo livro</strong> e

@@ -182,21 +182,8 @@ export async function createBook(
       });
     }
     revalidatePath("/painel/livros");
-    if (ctx.tenant.product === "business") {
-    try {
-      const { enqueueNewBookNotice } = await import("@/lib/whatsapp/notify");
-      await enqueueNewBookNotice({
-        type: "new_book",
-        tenantId: ctx.tenant.id,
-        bookId: row.id,
-        title: values.title,
-        author: values.author,
-        salePrice: String(values.salePrice),
-      });
-    } catch {
-      // notificação não bloqueia cadastro
-    }
-    }
+    // Aviso proativo de livro novo no WhatsApp ficou invasivo (blast por tag fraca).
+    // O bot continua só respondendo quem pergunta no Zap; alertas ficam no painel.
     return { ok: true, id: row.id };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

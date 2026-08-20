@@ -119,6 +119,19 @@ export async function countCopiesByBookIds(
   return map;
 }
 
+export async function listCopiesForBook(tenantId: string, bookId: string) {
+  return db
+    .select({
+      id: copies.id,
+      barcode: copies.barcode,
+      status: copies.status,
+      location: copies.location,
+    })
+    .from(copies)
+    .where(and(eq(copies.tenantId, tenantId), eq(copies.bookId, bookId)))
+    .orderBy(copies.barcode);
+}
+
 export async function countOpenLoansOnBook(
   tenantId: string,
   bookId: string,

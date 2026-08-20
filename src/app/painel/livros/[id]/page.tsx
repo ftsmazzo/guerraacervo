@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getAuthContext, hasEntitlement } from "@/lib/auth/context";
 import { getBook } from "@/lib/books/queries";
+import { listCopiesForBook } from "@/lib/library/copies";
 import { ReadingBookCard } from "@/components/reading/reading-cover";
 import { BookForm } from "../book-form";
 import "../livros.css";
@@ -20,6 +21,9 @@ export default async function EditarLivroPage({
   if (!book) notFound();
   const personal = ctx.tenant.product === "personal";
   const library = ctx.tenant.product === "library";
+  const copies = library
+    ? await listCopiesForBook(ctx.tenant.id, book.id)
+    : [];
 
   return (
     <div>
@@ -40,6 +44,7 @@ export default async function EditarLivroPage({
     <BookForm
       personal={personal}
       library={library}
+      copies={copies}
       initial={{
         id: book.id,
         isbn: book.isbn,
