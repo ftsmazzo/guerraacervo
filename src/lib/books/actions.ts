@@ -59,7 +59,7 @@ const personalBookInputSchema = bookInputSchema.extend({
 });
 
 function parseBookInput(input: unknown, product: string) {
-  return product === "personal"
+  return product === "personal" || product === "library"
     ? personalBookInputSchema.safeParse(input)
     : bookInputSchema.safeParse(input);
 }
@@ -172,6 +172,15 @@ export async function createBook(
       .values(values)
       .returning({ id: books.id });
     await syncBookTags(ctx.tenant.id, row.id, tagNames);
+    if (ctx.tenant.product === "library") {
+      const { syncCopiesForBook } = await import("@/lib/library/copies");
+      await syncCopiesForBook({
+        tenantId: ctx.tenant.id,
+        bookId: row.id,
+        desiredCount: parsed.data.estoque,
+        location: parsed.data.localizacao,
+      });
+    }
     revalidatePath("/painel/livros");
     if (ctx.tenant.product === "business") {
     try {
@@ -247,6 +256,15 @@ export async function updateBook(
       .where(and(eq(books.id, id), eq(books.tenantId, ctx.tenant.id)));
 
     await syncBookTags(ctx.tenant.id, id, tagNames);
+    if (ctx.tenant.product === "library") {
+      const { syncCopiesForBook } = await import("@/lib/library/copies");
+      await syncCopiesForBook({
+        tenantId: ctx.tenant.id,
+        bookId: id,
+        desiredCount: parsed.data.estoque,
+        location: parsed.data.localizacao,
+      });
+    }
 
     revalidatePath("/painel/livros");
     revalidatePath(`/painel/livros/${id}`);
@@ -297,6 +315,17 @@ export async function deleteBook(id: string): Promise<BookActionResult> {
       ok: false,
       error: "Não é possível excluir: livro está em pedido(s) ativo(s).",
     };
+  }
+
+  if (ctx.tenant.product === "library") {
+    const { countOpenLoansOnBook } = await import("@/lib/library/copies");
+    const open = await countOpenLoansOnBook(ctx.tenant.id, id);
+    if (open > 0) {
+      return {
+        ok: false,
+        error: "Não é possível excluir: há exemplar(es) emprestado(s).",
+      };
+    }
   }
 
   await db

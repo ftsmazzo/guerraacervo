@@ -14,7 +14,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-export const productEnum = pgEnum("product", ["personal", "business"]);
+export const productEnum = pgEnum("product", ["personal", "business", "library"]);
 export const tenantStatusEnum = pgEnum("tenant_status", [
   "trialing",
   "active",
@@ -458,4 +458,61 @@ export const readingComments = pgTable("reading_comments", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
+});
+
+export const copyStatusEnum = pgEnum("copy_status", [
+  "available",
+  "on_loan",
+  "lost",
+  "repair",
+]);
+
+export const loanStatusEnum = pgEnum("loan_status", [
+  "open",
+  "overdue",
+  "returned",
+]);
+
+export const copies = pgTable(
+  "copies",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    bookId: uuid("book_id")
+      .notNull()
+      .references(() => books.id, { onDelete: "cascade" }),
+    barcode: varchar("barcode", { length: 40 }).notNull(),
+    status: copyStatusEnum("status").notNull().default("available"),
+    location: varchar("location", { length: 120 }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("copies_tenant_barcode_uidx").on(t.tenantId, t.barcode),
+  ],
+);
+
+export const loans = pgTable("loans", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  copyId: uuid("copy_id")
+    .notNull()
+    .references(() => copies.id),
+  bookId: uuid("book_id")
+    .notNull()
+    .references(() => books.id),
+  clientId: uuid("client_id")
+    .notNull()
+    .references(() => clients.id),
+  borrowedAt: timestamp("borrowed_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+  returnedAt: timestamp("returned_at", { withTimezone: true }),
+  renewedCount: integer("renewed_count").notNull().default(0),
+  status: loanStatusEnum("status").notNull().default("open"),
+  ...timestamps,
 });

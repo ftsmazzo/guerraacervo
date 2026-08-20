@@ -148,9 +148,11 @@ type SrcState = "idle" | "searching" | "found" | "notfound";
 export function BookForm({
   initial,
   personal = false,
+  library = false,
 }: {
   initial?: BookFormInitial;
   personal?: boolean;
+  library?: boolean;
 }) {
   const router = useRouter();
   const isEdit = Boolean(initial?.id);
@@ -792,7 +794,7 @@ export function BookForm({
             : purchasePrice
               ? Number(purchasePrice)
               : null,
-          precoVenda: personal ? 0 : Number(salePrice),
+          precoVenda: personal || library ? 0 : Number(salePrice),
           estoque: personal ? 1 : Number(stock),
           localizacao: personal ? null : location || null,
           tags,
@@ -1120,7 +1122,9 @@ export function BookForm({
                 </div>
                 {personal ? null : (
                 <div>
-                  <label className="form-label">Localização no Sebo</label>
+                  <label className="form-label">
+                    {library ? "Localização" : "Localização no Sebo"}
+                  </label>
                   <input
                     className="form-control"
                     value={location}
@@ -1376,11 +1380,13 @@ export function BookForm({
 
             <div className="card">
               <div className="card-header">
-                {personal ? "Conservação" : "Preços, Estoque e Físico"}
+                {personal ? "Conservação" : library ? "Exemplares e físico" : "Preços, Estoque e Físico"}
               </div>
               <div className="card-body grid gap-3 sm:grid-cols-2 md:grid-cols-3">
                 {personal ? null : (
                   <>
+                {library ? null : (
+                <>
                 <div>
                   <label className="form-label">Preço Compra (R$)</label>
                   <input
@@ -1406,9 +1412,12 @@ export function BookForm({
                     onChange={(e) => setSalePrice(e.target.value)}
                   />
                 </div>
+                </>
+                )}
                 <div>
                   <label className="form-label">
-                    Estoque <span className="required-star">*</span>
+                    {library ? "Exemplares" : "Estoque"}{" "}
+                    <span className="required-star">*</span>
                   </label>
                   <input
                     type="number"
@@ -1418,7 +1427,12 @@ export function BookForm({
                     value={stock}
                     onChange={(e) => setStock(e.target.value)}
                   />
-                  {typeof initial?.reserved === "number" &&
+                  {library ? (
+                    <div className="form-text">
+                      Quantidade de cópias. Cada uma recebe um código de
+                      exemplar para empréstimo.
+                    </div>
+                  ) : typeof initial?.reserved === "number" &&
                   initial.reserved > 0 ? (
                     <div className="form-text" style={{ color: "#b45309" }}>
                       Reservado em pedidos (Aguardando Pagamento):{" "}

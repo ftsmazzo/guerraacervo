@@ -37,6 +37,7 @@ export default async function ClientesPage({
   }
 
   const sp = await searchParams;
+  const isLibrary = ctx.tenant.product === "library";
   const busca = sp.busca?.trim() || "";
   const rows = await listClients(ctx.tenant.id, { busca });
 
@@ -44,13 +45,13 @@ export default async function ClientesPage({
     <div className="clientes-page">
       <div className="page-header">
         <div>
-          <h4>Clientes</h4>
+          <h4>{isLibrary ? "Leitores" : "Clientes"}</h4>
           <small style={{ color: "var(--muted)" }}>
-            {rows.length} cliente(s)
+            {rows.length} {isLibrary ? "leitor(es)" : "cliente(s)"}
           </small>
         </div>
         <Link href="/painel/clientes/novo" className="btn-accent">
-          + Novo Cliente
+          {isLibrary ? "+ Novo leitor" : "+ Novo Cliente"}
         </Link>
       </div>
 
@@ -87,16 +88,24 @@ export default async function ClientesPage({
                   <th>WhatsApp</th>
                   <th>E-mail</th>
                   <th>Cidade / UF</th>
-                  <th style={{ textAlign: "center" }}>Pedidos</th>
-                  <th style={{ textAlign: "right" }}>Total Gasto</th>
+                  {isLibrary ? (
+                    <th style={{ textAlign: "center" }}>Cadastro</th>
+                  ) : (
+                    <>
+                      <th style={{ textAlign: "center" }}>Pedidos</th>
+                      <th style={{ textAlign: "right" }}>Total Gasto</th>
+                    </>
+                  )}
                   <th style={{ textAlign: "center" }}>Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="empty">
-                      Nenhum cliente encontrado
+                    <td colSpan={isLibrary ? 6 : 7} className="empty">
+                      {isLibrary
+                        ? "Nenhum leitor encontrado"
+                        : "Nenhum cliente encontrado"}
                     </td>
                   </tr>
                 ) : (
@@ -128,12 +137,22 @@ export default async function ClientesPage({
                           ? `${c.city}${c.state ? ` / ${c.state}` : ""}`
                           : "—"}
                       </td>
+                      {isLibrary ? (
+                        <td style={{ textAlign: "center" }}>
+                          <span className="badge">
+                            {c.createdAt.toLocaleDateString("pt-BR")}
+                          </span>
+                        </td>
+                      ) : (
+                        <>
                       <td style={{ textAlign: "center" }}>
                         <span className="badge">{c.totalOrders}</span>
                       </td>
                       <td style={{ textAlign: "right", fontWeight: 600 }}>
                         {money(c.totalSpent)}
                       </td>
+                        </>
+                      )}
                       <td>
                         <div className="actions">
                           <Link

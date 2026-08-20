@@ -1,9 +1,10 @@
-export type Product = "personal" | "business";
+export type Product = "personal" | "business" | "library";
 
 export type Entitlement =
   | "catalog"
   | "clients"
   | "orders"
+  | "lending"
   | "reports_basic"
   | "reports_advanced"
   | "store_whatsapp"
@@ -134,6 +135,24 @@ export const PLANS: Record<string, PlanDefinition> = {
       "ai_pricing",
     ],
   },
+
+  // ── Biblioteca institucional (empréstimo) ─────────────────
+  library_comunidade: {
+    code: "library_comunidade",
+    product: "library",
+    name: "Comunidade",
+    priceMonthlyBrl: 79.9,
+    maxBooks: 5000,
+    trialDays: 14,
+    entitlements: [
+      "catalog",
+      "clients",
+      "lending",
+      "reports_basic",
+      "store_whatsapp",
+      "export",
+    ],
+  },
 };
 
 export function getPlan(code: string): PlanDefinition | undefined {
@@ -157,6 +176,10 @@ export function businessPlans() {
 
 export function personalPlans() {
   return Object.values(PLANS).filter((p) => p.product === "personal");
+}
+
+export function libraryPlans() {
+  return Object.values(PLANS).filter((p) => p.product === "library");
 }
 
 export function isSignupPlanCode(code: string) {

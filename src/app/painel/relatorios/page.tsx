@@ -14,6 +14,7 @@ import {
   statusBreakdown,
   topBooksSold,
 } from "@/lib/reports/queries";
+import { getCirculationReport } from "@/lib/library/queries";
 import "./relatorios.css";
 
 function money(v: number) {
@@ -87,6 +88,89 @@ export default async function RelatoriosPage({
         entitlement="reports_basic"
         title="Relatórios"
       />
+    );
+  }
+
+  if (ctx.tenant.product === "library") {
+    const from = new Date(`${period.dataIni}T00:00:00`);
+    const to = new Date(`${period.dataFim}T23:59:59`);
+    const report = await getCirculationReport(ctx.tenant.id, from, to);
+    return (
+      <div className="relatorios-page">
+        <div className="mb-4">
+          <h1 className="text-2xl font-semibold text-ink">Relatórios</h1>
+          <p className="mt-1 text-sm text-muted">
+            Circulação · atrasados · disponíveis — sem receita.
+          </p>
+        </div>
+        <form className="filters" method="get">
+          <input type="hidden" name="periodo" value="custom" />
+          <label>
+            De
+            <input type="date" name="data_ini" defaultValue={period.dataIni} />
+          </label>
+          <label>
+            Até
+            <input type="date" name="data_fim" defaultValue={period.dataFim} />
+          </label>
+          <div className="actions">
+            <button type="submit" className="btn btn-accent">
+              Filtrar
+            </button>
+          </div>
+        </form>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: "Empréstimos no período", value: report.loansInPeriod },
+            { label: "Devoluções no período", value: report.returnedInPeriod },
+            { label: "Atrasados agora", value: report.overdueNow },
+            { label: "Exemplares disponíveis", value: report.availableCopies },
+          ].map((c) => (
+            <div key={c.label} className="rounded-lg border border-line bg-card p-4">
+              <p className="text-xs text-muted">{c.label}</p>
+              <p className="mt-2 text-2xl font-semibold text-ink">{c.value}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-6 overflow-x-auto rounded-lg border border-line bg-card">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-line text-xs text-muted">
+              <tr>
+                <th className="px-3 py-2">Leitor</th>
+                <th className="px-3 py-2">Título</th>
+                <th className="px-3 py-2">Emprestado</th>
+                <th className="px-3 py-2">Vence</th>
+                <th className="px-3 py-2">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {!report.recent.length ? (
+                <tr>
+                  <td colSpan={5} className="px-3 py-8 text-center text-muted">
+                    Sem circulação neste período.
+                  </td>
+                </tr>
+              ) : (
+                report.recent.map((l) => (
+                  <tr key={l.id} className="border-b border-line last:border-0">
+                    <td className="px-3 py-2">{l.readerName}</td>
+                    <td className="px-3 py-2">{l.title}</td>
+                    <td className="px-3 py-2">{fmtDate(l.borrowedAt)}</td>
+                    <td className="px-3 py-2">{fmtDate(l.dueAt)}</td>
+                    <td className="px-3 py-2">
+                      {l.status === "returned"
+                        ? "Devolvido"
+                        : l.status === "overdue"
+                          ? "Atrasado"
+                          : "Aberto"}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     );
   }
 

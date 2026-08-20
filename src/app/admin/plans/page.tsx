@@ -1,9 +1,9 @@
-import { businessPlans, personalPlans } from "@/lib/plans";
+import { businessPlans, libraryPlans, personalPlans } from "@/lib/plans";
 import { requirePlatformAdmin } from "@/lib/auth/guards";
 
 export default async function AdminPlansPage() {
   await requirePlatformAdmin();
-  const all = [...businessPlans(), ...personalPlans()];
+  const all = [...businessPlans(), ...personalPlans(), ...libraryPlans()];
 
   return (
     <div>

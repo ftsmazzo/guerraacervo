@@ -42,6 +42,7 @@ export function priceIdForPlan(planCode: string): string | null {
     personal_biblioteca: process.env.STRIPE_PRICE_BIBLIOTECA,
     personal_colecionador: process.env.STRIPE_PRICE_COLECIONADOR,
     personal_premium: process.env.STRIPE_PRICE_PREMIUM,
+    library_comunidade: process.env.STRIPE_PRICE_LIBRARY_COMUNIDADE,
   };
   const id = map[planCode]?.trim();
   return id || null;
@@ -55,6 +56,7 @@ export function planCodeFromPriceId(priceId: string): string | null {
     ["personal_biblioteca", process.env.STRIPE_PRICE_BIBLIOTECA],
     ["personal_colecionador", process.env.STRIPE_PRICE_COLECIONADOR],
     ["personal_premium", process.env.STRIPE_PRICE_PREMIUM],
+    ["library_comunidade", process.env.STRIPE_PRICE_LIBRARY_COMUNIDADE],
   ];
   for (const [code, id] of pairs) {
     if (id?.trim() === priceId) return code;

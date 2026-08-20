@@ -59,7 +59,9 @@ export async function provisionTenantAccount(
       error:
         plan.product === "personal"
           ? "Nome da biblioteca obrigatório."
-          : "Nome do sebo obrigatório.",
+          : plan.product === "library"
+            ? "Nome da biblioteca obrigatório."
+            : "Nome do sebo obrigatório.",
     };
   }
   if (!ownerName) return { ok: false, error: "Nome do responsável obrigatório." };
@@ -71,6 +73,9 @@ export async function provisionTenantAccount(
   if (!slug) return { ok: false, error: "Slug inválido." };
   if (!slug.startsWith("sebo-") && plan.product === "business") {
     slug = `sebo-${slug}`.slice(0, 60);
+  }
+  if (!slug.startsWith("bib-") && plan.product === "library") {
+    slug = `bib-${slug}`.slice(0, 60);
   }
 
   let passwordHash = input.passwordHash?.trim() || "";
@@ -138,11 +143,22 @@ export async function provisionTenantAccount(
         planCode: plan.code,
         status,
         trialEndsAt: wantsTrial ? trialEnds : null,
-        storeEnabled: plan.product === "business",
+        storeEnabled:
+          plan.product === "business" || plan.product === "library",
         stripeCustomerId: input.stripeCustomerId || null,
         stripeSubscriptionId: input.stripeSubscriptionId || null,
         referralCode,
-        settings: input.settings || {},
+        settings:
+          plan.product === "library"
+            ? {
+                library: {
+                  loanDays: 14,
+                  maxOpenLoans: 3,
+                  maxRenewals: 2,
+                },
+                ...(input.settings || {}),
+              }
+            : input.settings || {},
       })
       .returning();
 

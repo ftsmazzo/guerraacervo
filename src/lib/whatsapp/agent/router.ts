@@ -7,6 +7,7 @@ import {
   takePendingSearch,
 } from "@/lib/whatsapp/agent/debounce";
 import { pauseBotAndNotifyHandoff } from "@/lib/whatsapp/agent/handoff";
+import { handleLibraryInbound } from "@/lib/whatsapp/agent/library";
 import { runSalesAgent } from "@/lib/whatsapp/agent/sales";
 import {
   getWaLane,
@@ -101,6 +102,26 @@ export async function handleInboundMessage(opts: {
   }
 
   void sendComposing(cfg, conn.instanceName, phone);
+
+  const [tenantRow] = await db
+    .select({ product: tenants.product })
+    .from(tenants)
+    .where(eq(tenants.id, conn.tenantId))
+    .limit(1);
+  if (tenantRow?.product === "library") {
+    const text = opts.text.trim();
+    const client = await findClientByWhatsapp(conn.tenantId, phone);
+    await handleLibraryInbound({
+      cfg,
+      tenantId: conn.tenantId,
+      instanceName: conn.instanceName,
+      phone,
+      text,
+      clientId: client?.id,
+      readerName: client?.name,
+    });
+    return;
+  }
 
   const text = opts.text.trim();
   const client = await findClientByWhatsapp(conn.tenantId, phone);

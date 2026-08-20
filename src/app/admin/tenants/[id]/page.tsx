@@ -35,7 +35,7 @@ export default async function AdminTenantDetailPage({
 
   const plan = getPlan(tenant.planCode);
   const planOptions = Object.values(PLANS).filter(
-    (p) => p.product === "business",
+    (p) => p.product === tenant.product,
   );
 
   return (

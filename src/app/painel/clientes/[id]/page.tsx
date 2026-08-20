@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { clientProfiles } from "@/db/schema";
 import { getAuthContext, hasEntitlement } from "@/lib/auth/context";
 import { getClient } from "@/lib/clients/queries";
+import { listLoansForClient } from "@/lib/library/queries";
 import { listOrdersByClient } from "@/lib/orders/queries";
 import { ResumeBotButton } from "./resume-bot-button";
 import "../clientes.css";
@@ -64,8 +65,12 @@ export default async function ClienteViewPage({
   if (!c) notFound();
 
   const canOrders = hasEntitlement(ctx.tenant.planCode, "orders");
+  const isLibrary = ctx.tenant.product === "library";
   const pedidos = canOrders
     ? await listOrdersByClient(ctx.tenant.id, id)
+    : [];
+  const readerLoans = isLibrary
+    ? await listLoansForClient(ctx.tenant.id, id)
     : [];
 
   const [waProfile] = await db
@@ -191,6 +196,27 @@ export default async function ClienteViewPage({
         </div>
 
         <div className="stat-grid">
+          {isLibrary ? (
+            <>
+              <div className="card stat-card">
+                <div className="stat-val">
+                  {readerLoans.filter((l) => l.status !== "returned").length}
+                </div>
+                <div className="stat-lbl">Empréstimos abertos</div>
+              </div>
+              <div className="card stat-card">
+                <div className="stat-val accent">
+                  {readerLoans.filter((l) => l.status === "overdue").length}
+                </div>
+                <div className="stat-lbl">Atrasados</div>
+              </div>
+              <div className="card stat-card">
+                <div className="stat-val">{readerLoans.length}</div>
+                <div className="stat-lbl">Histórico</div>
+              </div>
+            </>
+          ) : (
+            <>
           <div className="card stat-card">
             <div className="stat-val">{c.totalOrders}</div>
             <div className="stat-lbl">Total de Pedidos</div>
@@ -203,15 +229,55 @@ export default async function ClienteViewPage({
             <div className="stat-val">{formatPeso(c.totalWeight)}</div>
             <div className="stat-lbl">Peso Total Enviado</div>
           </div>
+            </>
+          )}
         </div>
       </div>
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title-icon">●</span> Histórico de Pedidos
+          <span className="card-title-icon">●</span>{" "}
+          {isLibrary ? "Empréstimos" : "Histórico de Pedidos"}
         </div>
         <div className="card-body p-0">
-          {!canOrders ? (
+          {isLibrary ? (
+            readerLoans.length === 0 ? (
+              <div className="empty">Nenhum empréstimo</div>
+            ) : (
+              <div className="table-wrap">
+                <table className="data">
+                  <thead>
+                    <tr>
+                      <th>Título</th>
+                      <th>Código</th>
+                      <th>Emprestado</th>
+                      <th>Vence</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {readerLoans.map((l) => (
+                      <tr key={l.id}>
+                        <td>{l.title}</td>
+                        <td style={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
+                          {l.barcode}
+                        </td>
+                        <td>{l.borrowedAt.toLocaleDateString("pt-BR")}</td>
+                        <td>{l.dueAt.toLocaleDateString("pt-BR")}</td>
+                        <td>
+                          {l.status === "returned"
+                            ? "Devolvido"
+                            : l.status === "overdue"
+                              ? "Atrasado"
+                              : "Aberto"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          ) : !canOrders ? (
             <div className="empty">Plano sem módulo de pedidos.</div>
           ) : pedidos.length === 0 ? (
             <div className="empty">Nenhum pedido encontrado</div>

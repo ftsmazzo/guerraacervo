@@ -96,7 +96,7 @@ function mapApiToDraft(b: Record<string, unknown>, i: number): DraftBook {
   };
 }
 
-export function BatchPhotoForm() {
+export function BatchPhotoForm({ library = false }: { library?: boolean }) {
   const router = useRouter();
   const [preview, setPreview] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<DraftBook[]>([]);
@@ -156,12 +156,14 @@ export function BatchPhotoForm() {
       return;
     }
     for (const d of selected) {
-      const price = Number(d.precoVenda.replace(",", "."));
-      if (!Number.isFinite(price) || price <= 0) {
-        setError(`Informe o preço de venda de “${d.titulo}”.`);
-        return;
+      if (!library) {
+        const price = Number(d.precoVenda.replace(",", "."));
+        if (!Number.isFinite(price) || price <= 0) {
+          setError(`Informe o preço de venda de “${d.titulo}”.`);
+          return;
+        }
       }
-      const peso = Number(d.peso);
+      const peso = Number(d.peso || 300);
       if (!Number.isFinite(peso) || peso <= 0) {
         setError(`Informe o peso (g) de “${d.titulo}”.`);
         return;
@@ -179,10 +181,10 @@ export function BatchPhotoForm() {
       capaUrl: d.capaUrl.trim() || null,
       genero: d.genero.trim() || null,
       idioma: d.idioma.trim() || "Português",
-      peso: Number(d.peso),
+      peso: Number(d.peso || 300),
       estado: d.estado,
       tipoCapa: d.tipoCapa,
-      precoVenda: Number(d.precoVenda.replace(",", ".")),
+      precoVenda: library ? 0 : Number(d.precoVenda.replace(",", ".")),
       estoque: 1,
       tags: d.tags
         .split(",")
@@ -374,6 +376,7 @@ export function BatchPhotoForm() {
                         }
                       />
                     </label>
+                    {library ? null : (
                     <label className="text-xs text-muted block">
                       Preço venda (R$) *
                       <input
@@ -386,6 +389,7 @@ export function BatchPhotoForm() {
                         }
                       />
                     </label>
+                    )}
                     <label className="text-xs text-muted block">
                       Estado
                       <select

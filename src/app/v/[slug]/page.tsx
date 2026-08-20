@@ -2,6 +2,7 @@ import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { books, tenants } from "@/db/schema";
+import { listPublicCatalog } from "@/lib/library/queries";
 import {
   publicStoreUrl,
   slugCandidatesFromSubdomain,
@@ -19,6 +20,7 @@ async function resolveTenant(slugParam: string) {
       slug: tenants.slug,
       status: tenants.status,
       storeEnabled: tenants.storeEnabled,
+      product: tenants.product,
       settings: tenants.settings,
     })
     .from(tenants)
@@ -64,34 +66,51 @@ export default async function VitrinePage({
     typeof settings.reservationNotifyWhatsapp === "string"
       ? settings.reservationNotifyWhatsapp
       : null;
+  const isLibrary = tenant.product === "library";
 
   const busca = q?.trim() || "";
-  const conditions = [
-    eq(books.tenantId, tenant.id),
-    gt(books.stock, 0),
-    isNull(books.archivedAt),
-  ];
-  if (busca) {
-    const like = `%${busca}%`;
-    conditions.push(
-      sql`(${books.title} ilike ${like} or ${books.author} ilike ${like} or coalesce(${books.isbn}, '') ilike ${like})`,
-    );
-  }
-
-  const catalog = await db
-    .select({
-      id: books.id,
-      title: books.title,
-      author: books.author,
-      coverUrl: books.coverUrl,
-      salePrice: books.salePrice,
-      condition: books.condition,
-      stock: books.stock,
-    })
-    .from(books)
-    .where(and(...conditions))
-    .orderBy(books.title)
-    .limit(48);
+  const catalog = isLibrary
+    ? (await listPublicCatalog({
+        tenantId: tenant.id,
+        busca,
+        limit: 48,
+      })).map((b) => ({
+      id: b.id,
+      title: b.title,
+      author: b.author,
+      coverUrl: b.coverUrl,
+      salePrice: "0",
+      condition: b.condition,
+      stock: Number(b.available),
+      available: Number(b.available),
+    }))
+    : await (async () => {
+        const conditions = [
+          eq(books.tenantId, tenant.id),
+          gt(books.stock, 0),
+          isNull(books.archivedAt),
+        ];
+        if (busca) {
+          const like = `%${busca}%`;
+          conditions.push(
+            sql`(${books.title} ilike ${like} or ${books.author} ilike ${like} or coalesce(${books.isbn}, '') ilike ${like})`,
+          );
+        }
+        return db
+          .select({
+            id: books.id,
+            title: books.title,
+            author: books.author,
+            coverUrl: books.coverUrl,
+            salePrice: books.salePrice,
+            condition: books.condition,
+            stock: books.stock,
+          })
+          .from(books)
+          .where(and(...conditions))
+          .orderBy(books.title)
+          .limit(48);
+      })();
 
   const storeUrl = publicStoreUrl(tenant.slug);
   const hello = waLink(
@@ -103,7 +122,9 @@ export default async function VitrinePage({
     <main className="vitrine">
       <header className="vitrine__header">
         <div className="vitrine__brand">
-          <p className="vitrine__eyebrow">PrismaBook</p>
+          <p className="vitrine__eyebrow">
+            {isLibrary ? "Catálogo da biblioteca" : "PrismaBook"}
+          </p>
           <h1 className="vitrine__name">{tenant.name}</h1>
           <p className="vitrine__host">prismabook.com.br/v/{tenant.slug}</p>
         </div>
@@ -129,14 +150,20 @@ export default async function VitrinePage({
         <p className="vitrine__empty">
           {busca
             ? "Nenhum livro encontrado com esse termo."
-            : "Catálogo ainda sem livros à venda."}
+            : isLibrary
+              ? "Catálogo ainda sem títulos."
+              : "Catálogo ainda sem livros à venda."}
         </p>
       ) : (
         <ul className="vitrine__grid">
           {catalog.map((b) => {
+            const available =
+              "available" in b ? Number(b.available) : Number(b.stock);
             const bookWa = waLink(
               notifyPhone,
-              `Olá! Tenho interesse no livro "${b.title}"${b.author ? ` — ${b.author}` : ""}.`,
+              isLibrary
+                ? `Olá! Vi "${b.title}"${b.author ? ` — ${b.author}` : ""} no catálogo da ${tenant.name}.`
+                : `Olá! Tenho interesse no livro "${b.title}"${b.author ? ` — ${b.author}` : ""}.`,
             );
             return (
               <li key={b.id} className="vitrine__card">
@@ -151,13 +178,23 @@ export default async function VitrinePage({
                 <div className="vitrine__meta">
                   <h2>{b.title}</h2>
                   {b.author ? <p className="vitrine__author">{b.author}</p> : null}
-                  <p className="vitrine__price">{money(b.salePrice)}</p>
+                  {isLibrary ? (
+                    <p className="vitrine__price">
+                      {available > 0
+                        ? available === 1
+                          ? "Disponível agora"
+                          : `${available} exemplares disponíveis`
+                        : "Emprestado no momento"}
+                    </p>
+                  ) : (
+                    <p className="vitrine__price">{money(b.salePrice)}</p>
+                  )}
                   {b.condition ? (
                     <p className="vitrine__cond">{b.condition}</p>
                   ) : null}
                   {bookWa ? (
                     <a href={bookWa} target="_blank" rel="noreferrer">
-                      Pedir no Zap
+                      {isLibrary ? "Falar no Zap" : "Pedir no Zap"}
                     </a>
                   ) : null}
                 </div>

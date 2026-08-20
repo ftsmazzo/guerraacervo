@@ -23,6 +23,7 @@ export default async function LojaPage() {
     );
   }
 
+  const isLibrary = ctx.tenant.product === "library";
   const configured = Boolean(resolveEvolutionConfig());
   const conn = await getWhatsappConnection(ctx.tenant.id);
   const notifyPhone = await getReservationNotifyWhatsapp();
@@ -30,10 +31,13 @@ export default async function LojaPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="text-2xl font-semibold text-ink">Loja e alertas</h1>
+      <h1 className="text-2xl font-semibold text-ink">
+        {isLibrary ? "Catálogo e WhatsApp" : "Loja e alertas"}
+      </h1>
       <p className="mt-1 text-sm text-muted">
-        Instale o app no celular da prateleira, ative notificações e conecte o
-        WhatsApp do sebo.
+        {isLibrary
+          ? "Publique o catálogo com disponibilidade e conecte o WhatsApp para vencimento, atraso e renovar."
+          : "Instale o app no celular da prateleira, ative notificações e conecte o WhatsApp do sebo."}
       </p>
 
       <div className="mt-6 space-y-8">
@@ -45,7 +49,11 @@ export default async function LojaPage() {
             Vitrine pública
           </h2>
           <div className="rounded-lg border border-line bg-card px-4 py-3">
-            <p className="text-sm text-muted">Endereço do seu sebo na web:</p>
+            <p className="text-sm text-muted">
+              {isLibrary
+                ? "Endereço público do catálogo:"
+                : "Endereço do seu sebo na web:"}
+            </p>
             <a
               href={storeUrl}
               target="_blank"
@@ -55,8 +63,9 @@ export default async function LojaPage() {
               {storeUrl}
             </a>
             <p className="mt-2 text-xs text-muted">
-              Catálogo com estoque &gt; 0. O botão do WhatsApp usa o número de
-              alerta (passo 2).
+              {isLibrary
+                ? "Mostra se o título está disponível agora. Sem preço e sem nome do leitor."
+                : "Catálogo com estoque > 0. O botão do WhatsApp usa o número de alerta (passo 2)."}
             </p>
           </div>
         </section>
@@ -89,7 +98,7 @@ export default async function LojaPage() {
             id="wa-store-title"
             className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted"
           >
-            3 · WhatsApp do sebo (clientes)
+            3 · WhatsApp {isLibrary ? "da biblioteca (leitores)" : "do sebo (clientes)"}
           </h2>
           <WhatsappPanel
             configured={configured}

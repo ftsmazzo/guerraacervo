@@ -1,10 +1,10 @@
 "use server";
 
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { clients, orders } from "@/db/schema";
+import { clients, loans, orders } from "@/db/schema";
 import { getAuthContext } from "@/lib/auth/context";
 import { assertTenantCanWrite } from "@/lib/auth/guards";
 
@@ -178,6 +178,24 @@ export async function deleteClient(id: string): Promise<ClientActionResult> {
       ok: false,
       error:
         "Este cliente possui pedidos associados. Remova os pedidos antes de excluir.",
+    };
+  }
+
+  const [openLoans] = await db
+    .select({ n: count() })
+    .from(loans)
+    .where(
+      and(
+        eq(loans.clientId, id),
+        eq(loans.tenantId, ctx.tenant.id),
+        inArray(loans.status, ["open", "overdue"]),
+      ),
+    );
+  if ((openLoans?.n ?? 0) > 0) {
+    return {
+      ok: false,
+      error:
+        "Este leitor possui empréstimo(s) aberto(s). Devolva antes de excluir.",
     };
   }
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { PlanPicker } from "@/components/landing/plan-picker";
-import { businessPlans, personalPlans } from "@/lib/plans";
+import { businessPlans, libraryPlans, personalPlans } from "@/lib/plans";
 import "@/components/landing/landing.css";
 
 export const metadata: Metadata = {
@@ -31,6 +31,7 @@ export const metadata: Metadata = {
 export default function HomePage() {
   const negocio = businessPlans();
   const pessoal = personalPlans();
+  const bibliotecas = libraryPlans();
 
   return (
     <div className="landing">
@@ -198,6 +199,28 @@ export default function HomePage() {
             plans={pessoal}
             defaultPlanCode="personal_biblioteca"
             signupProduct="personal"
+          />
+        </div>
+      </section>
+
+      <section
+        id="bibliotecas"
+        className="landing-how"
+        aria-labelledby="library-title"
+      >
+        <div className="landing-section">
+          <h2 id="library-title" className="landing-section__title">
+            Para bibliotecas da instituição
+          </h2>
+          <p className="landing-section__lead">
+            Empresa, condomínio, igreja, ONG ou clube: empreste e devolva no
+            celular, com catálogo público e lembrete no WhatsApp. Sem sistema
+            acadêmico.
+          </p>
+          <PlanPicker
+            plans={bibliotecas}
+            defaultPlanCode="library_comunidade"
+            signupProduct="library"
           />
         </div>
       </section>

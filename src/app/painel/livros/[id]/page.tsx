@@ -19,6 +19,7 @@ export default async function EditarLivroPage({
   const book = await getBook(ctx.tenant.id, id);
   if (!book) notFound();
   const personal = ctx.tenant.product === "personal";
+  const library = ctx.tenant.product === "library";
 
   return (
     <div>
@@ -38,6 +39,7 @@ export default async function EditarLivroPage({
       ) : null}
     <BookForm
       personal={personal}
+      library={library}
       initial={{
         id: book.id,
         isbn: book.isbn,

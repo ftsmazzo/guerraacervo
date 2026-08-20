@@ -42,6 +42,25 @@ const nav: NavItem[] = [
   { href: "/painel/assinatura", label: "Assinatura" },
 ];
 
+const libraryNav: NavItem[] = [
+  { href: "/painel", label: "Início" },
+  { href: "/painel/livros", label: "Acervo", entitlement: "catalog" },
+  { href: "/painel/clientes", label: "Leitores", entitlement: "clients" },
+  { href: "/painel/circulacao", label: "Circulação", entitlement: "lending" },
+  {
+    href: "/painel/relatorios",
+    label: "Relatórios",
+    entitlement: "reports_basic",
+  },
+  {
+    href: "/painel/loja",
+    label: "Catálogo e WhatsApp",
+    entitlement: "store_whatsapp",
+  },
+  { href: "/painel/indique", label: "Indique e ganhe" },
+  { href: "/painel/assinatura", label: "Assinatura" },
+];
+
 const personalNav: NavItem[] = [
   { href: "/painel", label: "Início" },
   { href: "/painel/livros", label: "Estante", entitlement: "catalog" },
@@ -83,15 +102,19 @@ export default async function PainelLayout({
 
   const planCode = ctx.tenant?.planCode;
   const isPersonal = ctx.tenant?.product === "personal";
+  const isLibrary = ctx.tenant?.product === "library";
   const access = ctx.tenant ? tenantAccessOk(ctx.tenant) : { ok: true };
   const trial = ctx.tenant
     ? trialLabel(ctx.tenant.trialEndsAt, ctx.tenant.status)
     : null;
   const alerts =
-    ctx.tenant && !isPersonal ? await listTenantAlerts(ctx.tenant.id, 5) : [];
+    ctx.tenant && !isPersonal && !isLibrary
+      ? await listTenantAlerts(ctx.tenant.id, 5)
+      : [];
   const pathname = (await headers()).get("x-pathname") || "";
   const billingOpen = pathname.startsWith("/painel/assinatura");
-  const visibleNav = (isPersonal ? personalNav : nav).filter((item) =>
+  const navItems = isPersonal ? personalNav : isLibrary ? libraryNav : nav;
+  const visibleNav = navItems.filter((item) =>
     allowed(planCode, item.entitlement),
   );
   const mobileNav = isPersonal
@@ -101,13 +124,21 @@ export default async function PainelLayout({
         { href: "/painel/comunidade", label: "Comunidade" },
         { href: "/painel/leitura", label: "Plano" },
       ]
-    : [
-        { href: "/painel", label: "Início" },
-        { href: "/painel/pedidos", label: "Pedidos" },
-        { href: "/painel/livros", label: "Livros" },
-        { href: "/painel/relatorios", label: "Relatórios" },
-        { href: "/painel/loja#app-celular", label: "Loja" },
-      ];
+    : isLibrary
+      ? [
+          { href: "/painel", label: "Início" },
+          { href: "/painel/circulacao", label: "Circulação" },
+          { href: "/painel/livros", label: "Acervo" },
+          { href: "/painel/clientes", label: "Leitores" },
+          { href: "/painel/loja", label: "WhatsApp" },
+        ]
+      : [
+          { href: "/painel", label: "Início" },
+          { href: "/painel/pedidos", label: "Pedidos" },
+          { href: "/painel/livros", label: "Livros" },
+          { href: "/painel/relatorios", label: "Relatórios" },
+          { href: "/painel/loja#app-celular", label: "Loja" },
+        ];
 
   return (
     <div className="painel-shell min-h-screen md:grid md:grid-cols-[230px_1fr]">
@@ -128,7 +159,11 @@ export default async function PainelLayout({
               PrismaBook
             </p>
             <p className="truncate text-[0.62rem] text-[#9eb4ce]">
-              {isPersonal ? "Sua biblioteca" : "Painel do sebo"}
+              {isPersonal
+                ? "Sua biblioteca"
+                : isLibrary
+                  ? "Biblioteca"
+                  : "Painel do sebo"}
             </p>
           </div>
         </div>
@@ -164,7 +199,11 @@ export default async function PainelLayout({
               </p>
               <p className="truncate text-xs text-muted">
                 <span className="md:hidden">
-                  {isPersonal ? "Biblioteca · " : "Reservas · "}
+                  {isPersonal
+                    ? "Biblioteca · "
+                    : isLibrary
+                      ? "Circulação · "
+                      : "Reservas · "}
                 </span>
                 Plano: {ctx.tenant?.planName ?? "—"}
                 {trial ? ` · trial · ${trial}` : null}
@@ -184,7 +223,7 @@ export default async function PainelLayout({
             <div className="border-t border-line px-4 py-2 md:hidden">
               <PushAlertsCard
                 variant="compact"
-                kind={isPersonal ? "leitura" : "reservas"}
+                kind={isPersonal ? "leitura" : isLibrary ? "reservas" : "reservas"}
               />
             </div>
           ) : null}

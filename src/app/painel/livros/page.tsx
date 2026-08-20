@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAuthContext, hasEntitlement } from "@/lib/auth/context";
 import { listBooks, listTagCloud } from "@/lib/books/queries";
+import { countCopiesByBookIds } from "@/lib/library/copies";
 import { countByReadingStatus } from "@/lib/reading/queries";
 import { isReadingStatus, type ReadingStatus } from "@/lib/reading/types";
 import { DeleteBookButton } from "./delete-book-button";
@@ -85,6 +86,7 @@ export default async function LivrosPage({
   }
 
   const isPersonal = ctx.tenant.product === "personal";
+  const isLibrary = ctx.tenant.product === "library";
 
   const sp = await searchParams;
   const busca = sp.busca?.trim() || "";
@@ -144,6 +146,13 @@ export default async function LivrosPage({
     loadError = e instanceof Error ? e.message : String(e);
   }
 
+  const copyCounts = isLibrary
+    ? await countCopiesByBookIds(
+        ctx.tenant.id,
+        livros.map((l) => l.id),
+      )
+    : null;
+
   if (isPersonal) {
     return (
       <PersonalEstante
@@ -187,7 +196,7 @@ export default async function LivrosPage({
         <div>
           <h4>
             <span style={{ color: "var(--accent)", marginRight: 8 }}>📚</span>
-            Livros
+            {isLibrary ? "Acervo" : "Livros"}
           </h4>
           <small className="text-muted">
             {livros.length} registro(s)
@@ -346,8 +355,12 @@ export default async function LivrosPage({
                   <th className="text-center">Pág.</th>
                   {isPersonal ? null : (
                     <>
-                      <th className="text-end">Preço Venda</th>
-                      <th className="text-center">Estoque</th>
+                      {isLibrary ? null : (
+                        <th className="text-end">Preço Venda</th>
+                      )}
+                      <th className="text-center">
+                        {isLibrary ? "Exemplares" : "Estoque"}
+                      </th>
                       <th className="text-center">Disponível</th>
                       <th>Localização</th>
                     </>
@@ -431,12 +444,16 @@ export default async function LivrosPage({
                       </td>
                       {isPersonal ? null : (
                         <>
+                      {isLibrary ? null : (
                       <td className="text-end fw-semibold">
                         {money(l.salePrice)}
                       </td>
+                      )}
                       <td className="text-center">
-                        <span className="fw-semibold">{l.stock}</span>
-                        {l.reserved > 0 ? (
+                        <span className="fw-semibold">
+                          {copyCounts?.get(l.id)?.total ?? l.stock}
+                        </span>
+                        {!isLibrary && l.reserved > 0 ? (
                           <>
                             <br />
                             <small className="text-amber-700">
@@ -446,7 +463,15 @@ export default async function LivrosPage({
                         ) : null}
                       </td>
                       <td className="text-center">
-                        {l.available > 0 ? (
+                        {isLibrary ? (
+                          (copyCounts?.get(l.id)?.available ?? 0) > 0 ? (
+                            <span className="badge-disponivel">
+                              Disp. {copyCounts?.get(l.id)?.available ?? 0}
+                            </span>
+                          ) : (
+                            <span className="badge-esgotado">Emprestado</span>
+                          )
+                        ) : l.available > 0 ? (
                           <span className="badge-disponivel">
                             Disp. {l.available}
                           </span>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { businessPlans, getPlan, personalPlans } from "@/lib/plans";
+import { businessPlans, getPlan, libraryPlans, personalPlans } from "@/lib/plans";
 import { REFERRAL_COOKIE } from "@/lib/referrals/config";
 
 type Step = "form" | "otp";
@@ -30,10 +30,17 @@ export function CadastroForm() {
   const planFromQuery = getPlan(planParam);
   const isPersonal =
     productParam === "pessoal" || planFromQuery?.product === "personal";
+  const isLibrary =
+    productParam === "biblioteca" || planFromQuery?.product === "library";
 
   const plans = useMemo(
-    () => (isPersonal ? personalPlans() : businessPlans()),
-    [isPersonal],
+    () =>
+      isPersonal
+        ? personalPlans()
+        : isLibrary
+          ? libraryPlans()
+          : businessPlans(),
+    [isPersonal, isLibrary],
   );
   const defaultPlan =
     (planFromQuery && plans.some((p) => p.code === planFromQuery.code)
@@ -41,9 +48,15 @@ export function CadastroForm() {
       : null) ||
     (isPersonal
       ? plans.find((p) => p.code === "personal_biblioteca")?.code
-      : plans.find((p) => p.code === "business_profissional")?.code) ||
+      : isLibrary
+        ? plans.find((p) => p.code === "library_comunidade")?.code
+        : plans.find((p) => p.code === "business_profissional")?.code) ||
     plans[0]?.code ||
-    (isPersonal ? "personal_biblioteca" : "business_essencial");
+    (isPersonal
+      ? "personal_biblioteca"
+      : isLibrary
+        ? "library_comunidade"
+        : "business_essencial");
 
   const [step, setStep] = useState<Step>("form");
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -97,7 +110,9 @@ export function CadastroForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          tenantName: tenantName || (isPersonal ? `Biblioteca de ${ownerName}` : ""),
+          tenantName:
+            tenantName ||
+            (isPersonal ? `Biblioteca de ${ownerName}` : ""),
           ownerName,
           ownerEmail,
           password,
@@ -159,7 +174,9 @@ export function CadastroForm() {
   return (
     <div className="mx-auto max-w-lg px-6 py-12">
       <Link
-        href={isPersonal ? "/#para-voce" : "/#planos"}
+        href={
+          isPersonal ? "/#para-voce" : isLibrary ? "/#bibliotecas" : "/#planos"
+        }
         className="text-sm hover:underline"
         style={{ color: "var(--lp-ink-soft, #78716c)" }}
       >
@@ -172,7 +189,12 @@ export function CadastroForm() {
           color: "var(--lp-ink, #0b1a2f)",
         }}
       >
-        {isPersonal ? "Sua biblioteca" : "Começar teste"} — PrismaBook
+        {isPersonal
+          ? "Sua biblioteca"
+          : isLibrary
+            ? "Biblioteca da instituição"
+            : "Começar teste"}{" "}
+        — PrismaBook
       </h1>
       <p
         className="mt-2 text-sm"
@@ -220,13 +242,15 @@ export function CadastroForm() {
               />
             </Field>
           ) : (
-            <Field label="Nome do sebo">
+            <Field label={isLibrary ? "Nome da biblioteca" : "Nome do sebo"}>
               <input
                 required
                 className="mt-1 w-full rounded-md border border-line bg-background px-3 py-2 outline-none focus:border-accent"
                 value={tenantName}
                 onChange={(e) => setTenantName(e.target.value)}
-                placeholder="Sebo da Praça"
+                placeholder={
+                  isLibrary ? "Biblioteca da Associação" : "Sebo da Praça"
+                }
               />
             </Field>
           )}

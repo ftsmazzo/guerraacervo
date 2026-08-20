@@ -24,7 +24,7 @@ export default async function LoteFotoPage() {
           ← Voltar
         </Link>
       </div>
-      <BatchPhotoForm />
+      <BatchPhotoForm library={ctx.tenant.product === "library"} />
     </div>
   );
 }

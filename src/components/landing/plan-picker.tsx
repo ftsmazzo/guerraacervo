@@ -5,12 +5,13 @@ import { useMemo, useState } from "react";
 import type { Entitlement, PlanDefinition } from "@/lib/plans";
 
 const ENTITLEMENT_LABELS: Partial<Record<Entitlement, string>> = {
+  lending: "Empréstimo no balcão",
   catalog: "Catálogo de livros",
   clients: "Cadastro de clientes",
   orders: "Pedidos e vendas",
   reports_basic: "Relatórios essenciais",
   reports_advanced: "Relatórios avançados",
-  store_whatsapp: "Loja no WhatsApp",
+  store_whatsapp: "WhatsApp do catálogo",
   store_pix: "Cobrança Pix",
   ai_pricing: "Sugestão de preço com IA",
   wishlist: "Lista de desejos",
@@ -23,7 +24,7 @@ const ENTITLEMENT_LABELS: Partial<Record<Entitlement, string>> = {
 type Props = {
   plans: PlanDefinition[];
   defaultPlanCode?: string;
-  signupProduct?: "personal" | "business";
+  signupProduct?: "personal" | "business" | "library";
 };
 
 function formatPrice(value: number | null) {
@@ -114,7 +115,9 @@ export function PlanPicker({
             href={
               signupProduct === "personal"
                 ? `/cadastro?produto=pessoal&plano=${plan.code}`
-                : `/cadastro?plano=${plan.code}`
+                : signupProduct === "library"
+                  ? `/cadastro?produto=biblioteca&plano=${plan.code}`
+                  : `/cadastro?plano=${plan.code}`
             }
             className="landing-btn landing-btn--primary"
           >

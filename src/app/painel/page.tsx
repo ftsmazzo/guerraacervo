@@ -17,6 +17,7 @@ import {
   readingStreak,
 } from "@/lib/reading/queries";
 import { todayInTimeZone } from "@/lib/reading/types";
+import { countLibraryDashboard } from "@/lib/library/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export default async function PainelDashboardPage() {
   const planCode = ctx?.tenant?.planCode ?? "";
   const plan = getPlan(planCode);
   const isPersonal = ctx?.tenant?.product === "personal";
+  const isLibrary = ctx?.tenant?.product === "library";
 
   const bookCount = tenantId ? await countTenantBooks(tenantId) : 0;
   const limit = tenantId
@@ -40,8 +42,12 @@ export default async function PainelDashboardPage() {
       ? await countTenantClients(tenantId)
       : null;
   const openOrders =
-    !isPersonal && tenantId && hasEntitlement(planCode, "orders")
+    !isPersonal && !isLibrary && tenantId && hasEntitlement(planCode, "orders")
       ? await countOpenOrders(tenantId)
+      : null;
+  const libraryDash =
+    isLibrary && tenantId
+      ? await countLibraryDashboard(tenantId)
       : null;
 
   const readingPlan = isPersonal && tenantId ? await getReadingPlan(tenantId) : null;
@@ -81,23 +87,45 @@ export default async function PainelDashboardPage() {
               : `${bookCount} / ${limit.max}`,
         },
       ]
-    : [
-        {
-          label: "Títulos no catálogo",
-          value:
-            limit.max === null
-              ? String(bookCount)
-              : `${bookCount} / ${limit.max}`,
-        },
-        {
-          label: "Clientes",
-          value: clientCount === null ? "—" : String(clientCount),
-        },
-        {
-          label: "Pedidos abertos",
-          value: openOrders === null ? "—" : String(openOrders),
-        },
-      ];
+    : isLibrary
+      ? [
+          {
+            label: "Títulos no acervo",
+            value:
+              limit.max === null
+                ? String(bookCount)
+                : `${bookCount} / ${limit.max}`,
+          },
+          {
+            label: "Leitores",
+            value: clientCount === null ? "—" : String(clientCount),
+          },
+          {
+            label: "Empréstimos abertos",
+            value: String(libraryDash?.openLoans ?? 0),
+          },
+          {
+            label: "Atrasados",
+            value: String(libraryDash?.overdue ?? 0),
+          },
+        ]
+      : [
+          {
+            label: "Títulos no catálogo",
+            value:
+              limit.max === null
+                ? String(bookCount)
+                : `${bookCount} / ${limit.max}`,
+          },
+          {
+            label: "Clientes",
+            value: clientCount === null ? "—" : String(clientCount),
+          },
+          {
+            label: "Pedidos abertos",
+            value: openOrders === null ? "—" : String(openOrders),
+          },
+        ];
 
   return (
     <div>
@@ -114,11 +142,20 @@ export default async function PainelDashboardPage() {
             : null}
         .
       </p>
-      {!isPersonal ? (
+      {!isPersonal && !isLibrary ? (
         <p className="mt-3 rounded-md border border-line bg-card px-3 py-2.5 text-sm text-muted md:hidden">
           No celular da prateleira:{" "}
           <Link href="/painel/loja#app-celular" className="font-medium text-accent-text underline">
             instale o app e ative alertas
+          </Link>
+          .
+        </p>
+      ) : null}
+      {isLibrary ? (
+        <p className="mt-3 rounded-md border border-line bg-card px-3 py-2.5 text-sm text-muted">
+          Balcão:{" "}
+          <Link href="/painel/circulacao" className="font-medium text-accent-text underline">
+            emprestar e devolver
           </Link>
           .
         </p>

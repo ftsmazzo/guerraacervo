@@ -129,7 +129,13 @@ export async function buildSignupDraft(input: {
     input.tenantName.trim() ||
     (plan.product === "personal" ? `Biblioteca de ${ownerName}` : "");
   if (!tenantName) {
-    return { ok: false, error: "Informe o nome do sebo." };
+    return {
+      ok: false,
+      error:
+        plan.product === "library"
+          ? "Informe o nome da biblioteca."
+          : "Informe o nome do sebo.",
+    };
   }
 
   let slug = slugifyTenant(input.slug?.trim() || tenantName);
@@ -138,6 +144,9 @@ export async function buildSignupDraft(input: {
   }
   if (plan.product === "business" && !slug.startsWith("sebo-")) {
     slug = `sebo-${slug}`.slice(0, 60);
+  }
+  if (plan.product === "library" && !slug.startsWith("bib-")) {
+    slug = `bib-${slug}`.slice(0, 60);
   }
 
   return {
