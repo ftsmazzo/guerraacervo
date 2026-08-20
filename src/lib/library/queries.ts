@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { books, clients, copies, loans, tenants } from "@/db/schema";
 import { getLibraryPolicy } from "@/lib/library/policy";
@@ -41,14 +41,21 @@ export type ReaderSearchHit = {
   openLoans: number;
 };
 
+function asDate(v: Date | string | null | undefined): Date | null {
+  if (!v) return null;
+  const d = v instanceof Date ? v : new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 function effectiveStatus(
   status: "open" | "overdue" | "returned",
-  dueAt: Date,
-  returnedAt: Date | null,
+  dueAt: Date | string,
+  returnedAt: Date | string | null,
 ): "open" | "overdue" | "returned" {
-  if (returnedAt || status === "returned") return "returned";
-  if (dueAt.getTime() < Date.now()) return "overdue";
-  return "open";
+  if (asDate(returnedAt) || status === "returned") return "returned";
+  const due = asDate(dueAt);
+  if (due && due.getTime() < Date.now()) return "overdue";
+  return status === "overdue" ? "overdue" : "open";
 }
 
 export async function getTenantLibraryPolicy(tenantId: string) {
@@ -63,7 +70,8 @@ export async function getTenantLibraryPolicy(tenantId: string) {
 export async function listOpenLoans(
   tenantId: string,
 ): Promise<CirculationLoan[]> {
-  const rows = await db
+  try {
+    const rows = await db
     .select({
       id: loans.id,
       copyId: loans.copyId,
@@ -97,6 +105,10 @@ export async function listOpenLoans(
     ...r,
     status: effectiveStatus(r.status, r.dueAt, r.returnedAt),
   }));
+  } catch (err) {
+    console.error("[library] listOpenLoans", err);
+    return [];
+  }
 }
 
 export async function listLoansForClient(
@@ -144,36 +156,41 @@ export async function listLoansForClient(
 }
 
 export async function countLibraryDashboard(tenantId: string) {
-  const [openRow] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(loans)
-    .where(
-      and(
-        eq(loans.tenantId, tenantId),
-        inArray(loans.status, ["open", "overdue"]),
-      ),
-    );
-  const [overdueRow] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(loans)
-    .where(
-      and(
-        eq(loans.tenantId, tenantId),
-        inArray(loans.status, ["open", "overdue"]),
-        sql`${loans.dueAt} < now()`,
-      ),
-    );
-  const [availableRow] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(copies)
-    .where(
-      and(eq(copies.tenantId, tenantId), eq(copies.status, "available")),
-    );
-  return {
-    openLoans: Number(openRow?.n ?? 0),
-    overdue: Number(overdueRow?.n ?? 0),
-    availableCopies: Number(availableRow?.n ?? 0),
-  };
+  try {
+    const [openRow] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(loans)
+      .where(
+        and(
+          eq(loans.tenantId, tenantId),
+          inArray(loans.status, ["open", "overdue"]),
+        ),
+      );
+    const [overdueRow] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(loans)
+      .where(
+        and(
+          eq(loans.tenantId, tenantId),
+          inArray(loans.status, ["open", "overdue"]),
+          sql`${loans.dueAt} < now()`,
+        ),
+      );
+    const [availableRow] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(copies)
+      .where(
+        and(eq(copies.tenantId, tenantId), eq(copies.status, "available")),
+      );
+    return {
+      openLoans: Number(openRow?.n ?? 0),
+      overdue: Number(overdueRow?.n ?? 0),
+      availableCopies: Number(availableRow?.n ?? 0),
+    };
+  } catch (err) {
+    console.error("[library] countLibraryDashboard", err);
+    return { openLoans: 0, overdue: 0, availableCopies: 0 };
+  }
 }
 
 export async function searchReaders(
@@ -406,72 +423,86 @@ export type CirculationReport = {
   recent: CirculationLoan[];
 };
 
+export const EMPTY_CIRCULATION_REPORT: CirculationReport = {
+  loansInPeriod: 0,
+  returnedInPeriod: 0,
+  overdueNow: 0,
+  availableCopies: 0,
+  recent: [],
+};
+
 export async function getCirculationReport(
   tenantId: string,
   from: Date,
   to: Date,
 ): Promise<CirculationReport> {
-  const [made] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(loans)
-    .where(
-      and(
-        eq(loans.tenantId, tenantId),
-        sql`${loans.borrowedAt} >= ${from}`,
-        sql`${loans.borrowedAt} <= ${to}`,
-      ),
-    );
-  const [returned] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(loans)
-    .where(
-      and(
-        eq(loans.tenantId, tenantId),
-        sql`${loans.returnedAt} >= ${from}`,
-        sql`${loans.returnedAt} <= ${to}`,
-      ),
-    );
-  const dash = await countLibraryDashboard(tenantId);
-  const recentRows = await db
-    .select({
-      id: loans.id,
-      copyId: loans.copyId,
-      bookId: loans.bookId,
-      clientId: loans.clientId,
-      barcode: copies.barcode,
-      title: books.title,
-      author: books.author,
-      coverUrl: books.coverUrl,
-      readerName: clients.name,
-      readerWhatsapp: clients.whatsapp,
-      borrowedAt: loans.borrowedAt,
-      dueAt: loans.dueAt,
-      returnedAt: loans.returnedAt,
-      renewedCount: loans.renewedCount,
-      status: loans.status,
-    })
-    .from(loans)
-    .innerJoin(copies, eq(copies.id, loans.copyId))
-    .innerJoin(books, eq(books.id, loans.bookId))
-    .innerJoin(clients, eq(clients.id, loans.clientId))
-    .where(
-      and(
-        eq(loans.tenantId, tenantId),
-        sql`${loans.borrowedAt} >= ${from}`,
-        sql`${loans.borrowedAt} <= ${to}`,
-      ),
-    )
-    .orderBy(desc(loans.borrowedAt))
-    .limit(80);
+  try {
+    const [made] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(loans)
+      .where(
+        and(
+          eq(loans.tenantId, tenantId),
+          gte(loans.borrowedAt, from),
+          lte(loans.borrowedAt, to),
+        ),
+      );
+    const [returned] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(loans)
+      .where(
+        and(
+          eq(loans.tenantId, tenantId),
+          isNotNull(loans.returnedAt),
+          gte(loans.returnedAt, from),
+          lte(loans.returnedAt, to),
+        ),
+      );
+    const dash = await countLibraryDashboard(tenantId);
+    const recentRows = await db
+      .select({
+        id: loans.id,
+        copyId: loans.copyId,
+        bookId: loans.bookId,
+        clientId: loans.clientId,
+        barcode: copies.barcode,
+        title: books.title,
+        author: books.author,
+        coverUrl: books.coverUrl,
+        readerName: clients.name,
+        readerWhatsapp: clients.whatsapp,
+        borrowedAt: loans.borrowedAt,
+        dueAt: loans.dueAt,
+        returnedAt: loans.returnedAt,
+        renewedCount: loans.renewedCount,
+        status: loans.status,
+      })
+      .from(loans)
+      .innerJoin(copies, eq(copies.id, loans.copyId))
+      .innerJoin(books, eq(books.id, loans.bookId))
+      .innerJoin(clients, eq(clients.id, loans.clientId))
+      .where(
+        and(
+          eq(loans.tenantId, tenantId),
+          gte(loans.borrowedAt, from),
+          lte(loans.borrowedAt, to),
+        ),
+      )
+      .orderBy(desc(loans.borrowedAt))
+      .limit(80);
 
-  return {
-    loansInPeriod: Number(made?.n ?? 0),
-    returnedInPeriod: Number(returned?.n ?? 0),
-    overdueNow: dash.overdue,
-    availableCopies: dash.availableCopies,
-    recent: recentRows.map((r) => ({
-      ...r,
-      status: effectiveStatus(r.status, r.dueAt, r.returnedAt),
-    })),
-  };
+    return {
+      loansInPeriod: Number(made?.n ?? 0),
+      returnedInPeriod: Number(returned?.n ?? 0),
+      overdueNow: dash.overdue,
+      availableCopies: dash.availableCopies,
+      recent: recentRows.map((r) => ({
+        ...r,
+        status: effectiveStatus(r.status, r.dueAt, r.returnedAt),
+      })),
+    };
+  } catch (err) {
+    console.error("[library] getCirculationReport", err);
+    return EMPTY_CIRCULATION_REPORT;
+  }
 }

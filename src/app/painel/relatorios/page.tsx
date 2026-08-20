@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { EntitlementGate } from "@/components/entitlement-gate";
 import { getAuthContext, hasEntitlement } from "@/lib/auth/context";
 import { ORDER_STATUSES, PAYMENT_METHODS } from "@/lib/orders/constants";
-import { resolveReportPeriod } from "@/lib/reports/period";
+import { getCirculationReport } from "@/lib/library/queries";
+import { endOfDay, resolveReportPeriod, startOfDay } from "@/lib/reports/period";
 import {
   dailyRevenueSeries,
   getReportKpis,
@@ -14,7 +15,6 @@ import {
   statusBreakdown,
   topBooksSold,
 } from "@/lib/reports/queries";
-import { getCirculationReport } from "@/lib/library/queries";
 import "./relatorios.css";
 
 function money(v: number) {
@@ -92,9 +92,11 @@ export default async function RelatoriosPage({
   }
 
   if (ctx.tenant.product === "library") {
-    const from = new Date(`${period.dataIni}T00:00:00`);
-    const to = new Date(`${period.dataFim}T23:59:59`);
-    const report = await getCirculationReport(ctx.tenant.id, from, to);
+    const report = await getCirculationReport(
+      ctx.tenant.id,
+      startOfDay(period.dataIni),
+      endOfDay(period.dataFim),
+    );
     return (
       <div className="relatorios-page">
         <div className="mb-4">
@@ -290,6 +292,7 @@ async function ReportBody({
   advanced: boolean;
   exportQuery: string;
 }) {
+  try {
   const [kpis, sales, payments, statuses, topBooks, daily, stock, topSpend, topActive, topRecent] =
     await Promise.all([
       getReportKpis(tenantId, dataIni, dataFim),
@@ -726,4 +729,13 @@ async function ReportBody({
       </div>
     </>
   );
+  } catch (err) {
+    console.error("[relatorios] ReportBody", err);
+    return (
+      <p className="mt-6 rounded-md border border-line bg-card px-4 py-3 text-sm text-muted">
+        Não foi possível carregar os números agora. Atualize a página — se
+        continuar, o acervo ainda está sendo sincronizado.
+      </p>
+    );
+  }
 }
